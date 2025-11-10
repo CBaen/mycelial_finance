@@ -7,7 +7,15 @@
       "Bash(python scripts/test_backbone.py:*)",
       "Bash(pip install:*)",
       "Bash(python -m pip install:*)",
-      "Bash(redis-cli ping:*)"
+      "Bash(redis-cli ping:*)",
+      "Bash(python -m venv:*)",
+      "Bash(./venv/Scripts/python.exe -m pip:*)",
+      "Bash(./venv/Scripts/python.exe:*)",
+      "Bash(netstat:*)",
+      "Bash(tasklist:*)",
+      "Bash(sc query:*)",
+      "Bash(wmic process where \"ProcessId=3664\" get Name,ExecutablePath,CommandLine)",
+      "Bash(docker stop:*)"
     ],
     "deny": [],
     "ask": []
