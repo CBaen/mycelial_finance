@@ -15,7 +15,9 @@
       "Bash(tasklist:*)",
       "Bash(sc query:*)",
       "Bash(wmic process where \"ProcessId=3664\" get Name,ExecutablePath,CommandLine)",
-      "Bash(docker stop:*)"
+      "Bash(docker stop:*)",
+      "Bash(docker run:*)",
+      "Bash(docker rm:*)"
     ],
     "deny": [],
     "ask": []

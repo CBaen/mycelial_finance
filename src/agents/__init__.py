@@ -19,6 +19,6 @@ Architecture Reference:
 - Part 3: MARL Learning Engine (FRL/VDN/HAVEN)
 """
 
-from .base_agent import BaseAgent
+from .base_agent import MycelialAgent
 
-__all__ = ['BaseAgent']
+__all__ = ['MycelialAgent']

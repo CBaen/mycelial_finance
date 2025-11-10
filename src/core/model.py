@@ -17,7 +17,7 @@ class MycelialModel(mesa.Model):
     def __init__(self, pairs_to_trade: list, num_traders: int = 1, num_risk_managers: int = 1):
         super().__init__()
         self.running = True
-        self.schedule = mesa.time.RandomActivation(self)
+        # Mesa 3.x uses built-in agent management (no scheduler needed)
 
         # Initialize shared clients
         logging.info("Initializing shared clients...")
@@ -30,44 +30,46 @@ class MycelialModel(mesa.Model):
             return
 
         # --- Create Agent Population ---
-        agent_id = 0
+        # Mesa 3.x: unique_id is auto-generated, no need to track it
 
         # Create Data Miners (one for each pair)
         for pair in pairs_to_trade:
-            miner = DataMinerAgent(agent_id, self, pair_to_watch=pair)
-            self.schedule.add(miner)
-            agent_id += 1
+            miner = DataMinerAgent(self, pair_to_watch=pair)
+            self.register_agent(miner)
 
         # Create Pattern Learners (one for each pair)
         for pair in pairs_to_trade:
-            learner = PatternLearnerAgent(agent_id, self, pair_to_trade=pair)
-            self.schedule.add(learner)
-            agent_id += 1
+            learner = PatternLearnerAgent(self, pair_to_trade=pair)
+            self.register_agent(learner)
 
         # Create Trading Agents (the "hands")
         for i in range(num_traders):
-            trader = TradingAgent(agent_id, self)
-            self.schedule.add(trader)
-            agent_id += 1
+            trader = TradingAgent(self)
+            self.register_agent(trader)
 
         # Create Risk Managers (the "guardians")
         for i in range(num_risk_managers):
-            risker = RiskManagementAgent(agent_id, self, max_drawdown=0.05) # 5% drawdown
-            self.schedule.add(risker)
-            agent_id += 1
+            risker = RiskManagementAgent(self, max_drawdown=0.05) # 5% drawdown
+            self.register_agent(risker)
 
-        logging.info(f"Model initialized with {agent_id} agents.")
+        logging.info(f"Model initialized with {len(self.agents)} agents.")
 
     def step(self):
         """
         Advances the model by one step.
         This "ticks" all the agents in a random order.
+        Mesa 3.x: We manually step through agents using the built-in agents list.
         """
         if not self.running:
             return
 
         try:
-            self.schedule.step()
+            # Step each agent in random order
+            import random
+            agents_list = list(self.agents)
+            random.shuffle(agents_list)
+            for agent in agents_list:
+                agent.step()
         except Exception as e:
             logging.error(f"Error during model step: {e}")
             self.running = False

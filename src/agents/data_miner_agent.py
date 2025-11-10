@@ -9,12 +9,12 @@ class DataMinerAgent(MycelialAgent):
     publish it to the Redis network for other agents to use.
     It is the system's "sensory organ."
     """
-    def __init__(self, unique_id, model, pair_to_watch: str):
-        super().__init__(unique_id, model)
+    def __init__(self, model, pair_to_watch: str):
+        super().__init__(model)
         self.pair = pair_to_watch
         # Sanitize pair for channel name
         self.channel = f"market-data:{self.pair.replace('/', '-')}"
-        self.name = f"DataMiner_{self.pair}_{unique_id}"
+        self.name = f"DataMiner_{self.pair}_{self.unique_id}"
         logging.info(f"[{self.name}] Initialized. Watching {self.pair} on channel {self.channel}")
 
     def step(self):

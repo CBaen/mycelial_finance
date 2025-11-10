@@ -9,9 +9,9 @@ class RiskManagementAgent(MycelialAgent):
     It listens to trade confirmations and enforces risk rules.
     This is a simple implementation of the HAVEN concept (Part 3.4).
     """
-    def __init__(self, unique_id, model, max_drawdown: float = 0.10, halt_channel: str = "system-control"):
-        super().__init__(unique_id, model)
-        self.name = f"RiskManager_{unique_id}"
+    def __init__(self, model, max_drawdown: float = 0.10, halt_channel: str = "system-control"):
+        super().__init__(model)
+        self.name = f"RiskManager_{self.unique_id}"
         self.confirmation_channel = "trade-confirmations"
         self.halt_channel = halt_channel
 

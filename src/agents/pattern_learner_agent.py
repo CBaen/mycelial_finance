@@ -12,10 +12,10 @@ class PatternLearnerAgent(MycelialAgent):
     This first version uses a simple SMA Crossover.
     It MUST obey HALT commands from the RiskManagementAgent.
     """
-    def __init__(self, unique_id, model, pair_to_trade: str, short_window: int = 10, long_window: int = 30):
-        super().__init__(unique_id, model)
+    def __init__(self, model, pair_to_trade: str, short_window: int = 10, long_window: int = 30):
+        super().__init__(model)
         self.pair = pair_to_trade
-        self.name = f"PatternLearner_{self.pair}_{unique_id}"
+        self.name = f"PatternLearner_{self.pair}_{self.unique_id}"
 
         # Strategy parameters
         self.short_window = short_window

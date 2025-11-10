@@ -9,9 +9,9 @@ class TradingAgent(MycelialAgent):
     channel and executes trades via the Kraken client.
     It does not have its own "step" logic.
     """
-    def __init__(self, unique_id, model):
-        super().__init__(unique_id, model)
-        self.name = f"Trader_{unique_id}"
+    def __init__(self, model):
+        super().__init__(model)
+        self.name = f"Trader_{self.unique_id}"
         self.order_channel = "trade-orders"
         self.confirmation_channel = "trade-confirmations"
 

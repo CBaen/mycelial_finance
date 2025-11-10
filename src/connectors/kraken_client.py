@@ -1,5 +1,5 @@
 # src/connectors/kraken_client.py
-import kraken_sdk
+from kraken.spot import User, Market, Trade
 from config.settings import KRAKEN_API_KEY, KRAKEN_API_SECRET
 import logging
 import time
@@ -15,15 +15,26 @@ class KrakenClient:
             if not KRAKEN_API_KEY or not KRAKEN_API_SECRET:
                 logging.error("Kraken API Key/Secret not configured. Client will not initialize.")
                 self.client = None
+                self.user = None
+                self.market = None
+                self.trade = None
                 return
 
-            self.client = kraken_sdk.Client(KRAKEN_API_KEY, KRAKEN_API_SECRET)
+            # Initialize the three main API clients
+            self.user = User(key=KRAKEN_API_KEY, secret=KRAKEN_API_SECRET)
+            self.market = Market(key=KRAKEN_API_KEY, secret=KRAKEN_API_SECRET)
+            self.trade = Trade(key=KRAKEN_API_KEY, secret=KRAKEN_API_SECRET)
+            self.client = self.user  # For backwards compatibility
+
             # Test connection
-            self.client.get_account_balance()
+            self.user.get_account_balance()
             logging.info("KrakenClient initialized and connection tested.")
         except Exception as e:
             logging.error(f"Failed to initialize KrakenClient: {e}")
             self.client = None
+            self.user = None
+            self.market = None
+            self.trade = None
 
     def get_account_balance(self) -> dict:
         """Fetches the user's account balance."""
@@ -38,17 +49,15 @@ class KrakenClient:
 
     def get_market_data(self, pair: str) -> dict:
         """Fetches the latest ticker information for a given pair."""
-        if not self.client:
+        if not self.market:
             logging.error("Kraken client not initialized.")
             return {}
         try:
-            # The v1 'Ticker' endpoint is good for this
-            result = self.client.get_ticker_information(pair)
-            if 'result' in result:
-                # The structure is a bit nested
-                pair_key = list(result['result'].keys())[0]
-                return result['result'][pair_key]
-            return {}
+            # Use the Market client to get ticker data
+            result = self.market.get_ticker(pair=pair)
+            if result and isinstance(result, dict) and pair in result:
+                return result[pair]
+            return result if result else {}
         except Exception as e:
             logging.error(f"Error fetching market data for {pair}: {e}")
             return {}
@@ -59,23 +68,24 @@ class KrakenClient:
         direction: 'buy' or 'sell'
         order_type: 'market' or 'limit'
         """
-        if not self.client:
+        if not self.trade:
             logging.error("Kraken client not initialized. Order cancelled.")
             return {"status": "error", "message": "Client not initialized."}
 
-        params = {
-            'pair': pair,
-            'type': direction,
-            'ordertype': order_type,
-            'volume': str(amount),
-            'validate': True # Test order before executing
-        }
-        if order_type == 'limit' and price:
-            params['price'] = str(price)
-
         try:
-            # We use 'add_order' from the SDK
-            result = self.client.add_order(params)
+            # Build order parameters for the new SDK
+            order_params = {
+                'ordertype': order_type,
+                'side': direction,
+                'pair': pair,
+                'volume': amount,
+                'validate': True  # Test order before executing
+            }
+            if order_type == 'limit' and price:
+                order_params['price'] = price
+
+            # Use create_order from Trade client
+            result = self.trade.create_order(**order_params)
             logging.info(f"Order placed: {result}")
             return result
         except Exception as e:
