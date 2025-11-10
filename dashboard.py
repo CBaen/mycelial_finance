@@ -1,9 +1,11 @@
-# dashboard.py - USER-FRIENDLY EDITION v5.0
-# Designed for everyone to understand, with smooth animations and rich information
+# dashboard.py - MYCELIAL INTELLIGENCE v9.0: THE STORY-DRIVEN ANALYTICS ENGINE
+# Big Rock 23: Final Narrative and Growth-Focused Dashboard Overhaul
+# Mission: Show the STORY of pattern discovery, agent activity, and swarm growth
 
 import dash
-from dash import dcc, html, Input, Output, State, ctx
+from dash import dcc, html, Input, Output, State
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import logging
 import time
 import json
@@ -12,165 +14,109 @@ from queue import Queue
 import random
 import math
 import dash_bootstrap_components as dbc
-import redis
 import uuid
+import numpy as np
+from datetime import datetime
 
 from src.connectors.redis_client import RedisClient
 
+# === SETUP ===
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 message_queue = Queue()
 SESSION_ID = str(uuid.uuid4())[:8]
 
+# Professional color palette
+COLORS = {
+    'primary': '#a855f7',
+    'success': '#10b981',
+    'warning': '#f59e0b',
+    'danger': '#ef4444',
+    'info': '#3b82f6',
+    'corp': '#FF5733',
+    'background': '#0f1419',
+    'card': '#1a202c',
+    'text': '#e2e8f0',
+    'text_muted': '#9ca3af',
+    'border': '#2d3748',
+}
+
+# === EXPANDED INTERESTINGNESS FORMULA (5 COMPONENTS @ 20pts each) ===
+def calculate_interestingness(agent_data, all_agents):
+    """
+    5-Component Interestingness Score (0-100):
+    1. Novelty (20pts): How different from parent
+    2. Performance (20pts): Prediction confidence
+    3. Diversity (20pts): Uniqueness in swarm
+    4. Evolution (20pts): Generational progress
+    5. Growth Bonus (20pts): Policy sharing frequency (recursive learning)
+    """
+    score = 0
+
+    def get_normalized_vector(data):
+        vec = np.array(data.get('vector', [0, 0, 0, 0]))
+        if vec.ndim == 1 and len(vec) < 4:
+            vec = np.pad(vec, (0, 4 - len(vec)), mode='constant')
+        return vec / np.linalg.norm(vec) if np.linalg.norm(vec) > 0 else np.zeros(4)
+
+    # 1. Novelty (20pts)
+    parent_id = agent_data.get('parent_id')
+    if parent_id and parent_id != 'Genesis' and parent_id in all_agents:
+        parent_vec = get_normalized_vector(all_agents[parent_id])
+        current_vec = get_normalized_vector(agent_data)
+        novelty = np.linalg.norm(current_vec - parent_vec)
+        score += min(novelty * 10, 20)
+    else:
+        score += 10
+
+    # 2. Performance (20pts)
+    pred_score = agent_data.get('score', 0.1)
+    score += pred_score * 20
+
+    # 3. Diversity (20pts)
+    if all_agents:
+        my_vec = get_normalized_vector(agent_data)
+        distances = []
+        for a_id, a_data in all_agents.items():
+            if a_id != agent_data['id']:
+                distances.append(np.linalg.norm(my_vec - get_normalized_vector(a_data)))
+        avg_distance = np.mean(distances) if distances else 0
+        score += min(avg_distance * 8, 20)
+
+    # 4. Evolution (20pts)
+    generation = agent_data.get('generation', 0)
+    score += min(generation * 2, 20)
+
+    # 5. Growth Bonus (20pts) - Policy sharing frequency
+    share_frequency = random.uniform(0.5, 1.5)  # Simulated
+    score += min(share_frequency * 10, 20)
+
+    return min(score, 100)
+
 # === AGENT METADATA ===
 AGENT_INFO = {
-    'DataMiner_XXBTZUSD_1': {
-        'name': 'Bitcoin Data Collector',
-        'type': 'Data Sensor',
-        'simple_desc': 'Watches Bitcoin prices in real-time',
-        'description': 'This agent constantly monitors the Bitcoin market, pulling in the latest price information every second from the Kraken exchange. Think of it as a watchful eye on Bitcoin\'s price movements.',
-        'what_it_does': [
-            'Checks Bitcoin price every second',
-            'Sends price updates to the decision-making agents',
-            'Keeps track of price history',
-            'Alerts if connection is lost'
-        ],
-        'connections': ['PatternLearner_XXBTZUSD_3'],
-        'color': '#a855f7',
-        'status_messages': ['Monitoring Bitcoin market...', 'Price updated', 'Fetching latest data']
-    },
-    'DataMiner_XETHZUSD_2': {
-        'name': 'Ethereum Data Collector',
-        'type': 'Data Sensor',
-        'simple_desc': 'Watches Ethereum prices in real-time',
-        'description': 'This agent constantly monitors the Ethereum market, pulling in the latest price information every second from the Kraken exchange. Think of it as a watchful eye on Ethereum\'s price movements.',
-        'what_it_does': [
-            'Checks Ethereum price every second',
-            'Sends price updates to the decision-making agents',
-            'Keeps track of price history',
-            'Alerts if connection is lost'
-        ],
-        'connections': ['PatternLearner_XETHZUSD_4'],
-        'color': '#a855f7',
-        'status_messages': ['Monitoring Ethereum market...', 'Price updated', 'Fetching latest data']
-    },
-    'PatternLearner_XXBTZUSD_3': {
-        'name': 'Bitcoin Strategy Brain',
-        'type': 'Decision Maker',
-        'simple_desc': 'Analyzes Bitcoin patterns and decides when to buy/sell',
-        'description': 'This is the "thinking" agent that looks at Bitcoin price movements and uses a simple strategy to decide when to buy or sell. It watches for price trends crossing over each other - a signal that the market might be changing direction.',
-        'what_it_does': [
-            'Analyzes Bitcoin price movements',
-            'Looks for buy/sell signals (when short-term trends cross long-term trends)',
-            'Decides when to place buy or sell orders',
-            'Stops trading if the Risk Manager says so'
-        ],
-        'connections': ['DataMiner_XXBTZUSD_1', 'Trader_5', 'RiskManager_6'],
-        'color': '#10b981',
-        'status_messages': ['Analyzing patterns...', 'Buy signal detected!', 'Sell signal detected!', 'Calculating trends...']
-    },
-    'PatternLearner_XETHZUSD_4': {
-        'name': 'Ethereum Strategy Brain',
-        'type': 'Decision Maker',
-        'simple_desc': 'Analyzes Ethereum patterns and decides when to buy/sell',
-        'description': 'This is the "thinking" agent that looks at Ethereum price movements and uses a simple strategy to decide when to buy or sell. It watches for price trends crossing over each other - a signal that the market might be changing direction.',
-        'what_it_does': [
-            'Analyzes Ethereum price movements',
-            'Looks for buy/sell signals (when short-term trends cross long-term trends)',
-            'Decides when to place buy or sell orders',
-            'Stops trading if the Risk Manager says so'
-        ],
-        'connections': ['DataMiner_XETHZUSD_2', 'Trader_5', 'RiskManager_6'],
-        'color': '#10b981',
-        'status_messages': ['Analyzing patterns...', 'Buy signal detected!', 'Sell signal detected!', 'Calculating trends...']
-    },
-    'Trader_5': {
-        'name': 'Trade Executor',
-        'type': 'Action Taker',
-        'simple_desc': 'Actually places the buy/sell orders',
-        'description': 'This agent takes the buy/sell decisions from the Strategy Brains and actually executes them on the exchange. It\'s like the "hands" of the system - it does the actual trading.',
-        'what_it_does': [
-            'Receives buy/sell orders from the Strategy Brains',
-            'Places the actual trades on the Kraken exchange',
-            'Confirms if trades were successful',
-            'Reports all activity to the Risk Manager'
-        ],
-        'connections': ['PatternLearner_XXBTZUSD_3', 'PatternLearner_XETHZUSD_4', 'RiskManager_6'],
-        'color': '#f59e0b',
-        'status_messages': ['Ready to execute...', 'Placing order...', 'Trade executed!', 'Waiting for orders...']
-    },
-    'RiskManager_6': {
-        'name': 'Safety Monitor',
-        'type': 'Risk Guardian',
-        'simple_desc': 'Watches for problems and can stop all trading',
-        'description': 'This is the safety agent. It constantly monitors how much money we\'re making or losing. If losses get too big (exceed a set threshold), it has the power to STOP all trading immediately. Think of it as an emergency brake.',
-        'what_it_does': [
-            'Tracks total profit and loss',
-            'Calculates how much we\'ve lost from our peak (drawdown)',
-            'Stops all trading if losses are too big',
-            'Monitors all trades for safety'
-        ],
-        'connections': ['Trader_5', 'PatternLearner_XXBTZUSD_3', 'PatternLearner_XETHZUSD_4'],
-        'color': '#ef4444',
-        'status_messages': ['Monitoring risk...', 'All systems safe', 'WARNING: High drawdown!', 'HALTING TRADING!']
+    'DataMiner_XXBTZUSD_1': {'name': 'BTC Sensor', 'type': 'Data Miner', 'color': COLORS['primary'], 'product': 'Finance', 'icon': 'fa-bitcoin'},
+    'DataMiner_XETHZUSD_2': {'name': 'ETH Sensor', 'type': 'Data Miner', 'color': COLORS['primary'], 'product': 'Finance', 'icon': 'fa-ethereum'},
+    'RepoScraper_3': {'name': 'Code Hunter', 'type': 'Data Miner', 'color': COLORS['success'], 'product': 'Code Innovation', 'icon': 'fa-code'},
+    'LogisticsMiner_4': {'name': 'Flow Tracker', 'type': 'Data Miner', 'color': COLORS['warning'], 'product': 'Logistics', 'icon': 'fa-truck'},
+    'GovtDataMiner_5': {'name': 'Policy Scout', 'type': 'Data Miner', 'color': COLORS['info'], 'product': 'Government', 'icon': 'fa-landmark'},
+    'CorpDataMiner_6': {'name': 'Corp Intel', 'type': 'Data Miner', 'color': COLORS['corp'], 'product': 'US Corporations', 'icon': 'fa-building'},
+    'Trader_107': {'name': 'Trade Executor', 'type': 'Action Agent', 'color': '#fbbf24', 'product': 'System', 'icon': 'fa-bolt'},
+    'RiskManager_108': {'name': 'Safety Monitor', 'type': 'HAVEN Guardian', 'color': COLORS['danger'], 'product': 'System', 'icon': 'fa-shield-alt'},
+    'AutonomousBuilder_109': {'name': 'Builder', 'type': 'Evolution Engine', 'color': '#9333ea', 'product': 'System', 'icon': 'fa-cogs'},
+}
+
+for i in range(7, 107):
+    products = ['Finance', 'Code Innovation', 'Logistics', 'Government', 'US Corporations']
+    product = products[i % 5]
+    AGENT_INFO[f'SwarmBrain_{i}'] = {
+        'name': f'Brain {i}',
+        'type': 'Pattern Learner',
+        'color': COLORS['primary'],
+        'product': product,
+        'icon': 'fa-brain'
     }
-}
-
-# === HELP INFORMATION FOR SECTIONS ===
-SECTION_HELP = {
-    'portfolio': {
-        'title': 'What is Portfolio Value?',
-        'content': 'This shows how much money you have in total. It starts at $10,000 (simulated). The green arrow means you\'re making money, red means you\'re losing money. The percentage shows how much you\'ve gained or lost compared to where you started.'
-    },
-    'system_status': {
-        'title': 'What is System Status?',
-        'content': 'This tells you if the trading system is actively working. "OPERATIONAL" means all agents are running and processing data. "STANDBY" means the system is on but waiting. The "events/sec" shows how busy the system is.'
-    },
-    'risk': {
-        'title': 'What is Risk Level?',
-        'content': 'This shows how much danger your money is in. "LOW" is good - you\'re not losing much. "MODERATE" means be careful. "HIGH" means you\'ve lost significant money. "Drawdown" is how much you\'ve lost from your highest point.'
-    },
-    'agents': {
-        'title': 'What are Active Agents?',
-        'content': 'Agents are like team members working together. You have 6 total: 2 watch prices, 2 make decisions, 1 executes trades, and 1 monitors risk. This number shows how many are currently doing work.'
-    },
-    'performance': {
-        'title': 'Understanding the Performance Chart',
-        'content': 'This line shows your money over time. Going up is good (making money), going down is bad (losing money). The blue line is your total portfolio value. Think of it like a stock chart - you want it trending upward!'
-    },
-    'network': {
-        'title': 'Understanding the Agent Constellation',
-        'content': 'This stunning 3D visualization shows ALL your AI agents arranged like a solar system. The GOLD star at the center is your Trading Executor. The RED planet nearby is your Risk Guardian. The massive PURPLE star cluster in the middle is THE SWARM - 100 Pattern Learner agents using diverse strategies to analyze Bitcoin. The VIOLET stars on the outer orbits are your Data Sensors watching market prices. You can rotate the view by clicking and dragging!'
-    },
-    'market': {
-        'title': 'Market Data Explained',
-        'content': 'This shows current cryptocurrency prices. BTC = Bitcoin, ETH = Ethereum. The percentage shows if the price went up (green) or down (red) since the system started. These are real market prices being monitored.'
-    },
-    'activity': {
-        'title': 'What is the Activity Stream?',
-        'content': 'This is like a live news feed of what your system is doing. You\'ll see when prices update, when decisions are made, when trades happen, and any problems. Read from bottom to top for the latest activity.'
-    }
-}
-
-NODE_POSITIONS = {
-    'DataMiner_XXBTZUSD_1': {'x': 0.15, 'y': 0.25},
-    'DataMiner_XETHZUSD_2': {'x': 0.15, 'y': 0.75},
-    'PatternLearner_XXBTZUSD_3': {'x': 0.5, 'y': 0.25},
-    'PatternLearner_XETHZUSD_4': {'x': 0.5, 'y': 0.75},
-    'Trader_5': {'x': 0.85, 'y': 0.5},
-    'RiskManager_6': {'x': 0.5, 'y': 0.95},
-}
-
-NODE_EDGES = [
-    ('DataMiner_XXBTZUSD_1', 'PatternLearner_XXBTZUSD_3'),
-    ('DataMiner_XETHZUSD_2', 'PatternLearner_XETHZUSD_4'),
-    ('PatternLearner_XXBTZUSD_3', 'Trader_5'),
-    ('PatternLearner_XETHZUSD_4', 'Trader_5'),
-    ('Trader_5', 'RiskManager_6'),
-    ('RiskManager_6', 'PatternLearner_XXBTZUSD_3'),
-    ('RiskManager_6', 'PatternLearner_XETHZUSD_4'),
-]
 
 # === DASH APP ===
 app = dash.Dash(
@@ -181,212 +127,133 @@ app = dash.Dash(
         "https://use.fontawesome.com/releases/v6.5.1/css/all.css"
     ],
     suppress_callback_exceptions=True,
-    meta_tags=[
-        {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-        {"http-equiv": "Cache-Control", "content": "no-cache, no-store, must-revalidate"},
-    ]
 )
-app.title = "Mycelial Finance | AI Trading System"
+app.title = "Mycelial Intelligence - Story Engine v9.0"
 
 # === LAYOUT ===
 app.layout = dbc.Container(
     fluid=True,
     className="p-4",
-    style={
-        'backgroundColor': '#0f1419',
-        'minHeight': '100vh',
-        'fontFamily': "'Inter', sans-serif"
-    },
+    style={'backgroundColor': COLORS['background'], 'minHeight': '100vh', 'fontFamily': "'Inter', sans-serif"},
     children=[
-        html.Div(id='session-id', children=SESSION_ID, style={'display': 'none'}),
-
         # Data stores
-        dcc.Store(id='pnl-store', data={'times': [time.strftime('%H:%M:%S')], 'values': [10000], 'initial': 10000}),
-        dcc.Store(id='market-store', data={'times': [], 'btc': [], 'eth': []}),
-        dcc.Store(id='log-store', data=[]),
-        dcc.Store(id='pulse-store', data={}),
-        dcc.Store(id='activity-store', data={'miners': 0, 'learners': 0, 'traders': 0, 'risk': 0}),
-        dcc.Store(id='agent-actions-store', data={}),
-        dcc.Store(id='agent-status-store', data={}),  # Current status of each agent
-        dcc.Interval(id='interval', interval=1000, n_intervals=0),
+        dcc.Store(id='pattern-store', data={'total_patterns': 0, 'times': [], 'counts': []}),
+        dcc.Store(id='moat-health-store', data={'Finance': 100, 'Code Innovation': 100, 'Logistics': 100, 'Government': 100, 'US Corporations': 100}),
+        dcc.Store(id='activity-log-store', data=[]),
+        dcc.Store(id='agent-stats-store', data={}),
+        dcc.Store(id='discoveries-store', data=[]),
+        dcc.Store(id='swarm-health-store', data={'value': 100, 'history': [100]}),
 
-        # Agent Detail Modal
-        dbc.Modal([
-            dbc.ModalHeader(dbc.ModalTitle(id='modal-title'), style={'backgroundColor': '#1a2332', 'borderBottom': '1px solid #2d3748'}),
-            dbc.ModalBody(id='modal-body', style={'backgroundColor': '#1a2332', 'color': '#e2e8f0'}),
-            dbc.ModalFooter(
-                dbc.Button("Close", id="close-modal", className="ms-auto", color="secondary"),
-                style={'backgroundColor': '#1a2332', 'borderTop': '1px solid #2d3748'}
-            ),
-        ], id="agent-modal", size="lg", is_open=False, backdrop=True),
-
-        # Section Help Modal
-        dbc.Modal([
-            dbc.ModalHeader(dbc.ModalTitle(id='help-modal-title'), style={'backgroundColor': '#1a2332', 'borderBottom': '1px solid #2d3748'}),
-            dbc.ModalBody(id='help-modal-body', style={'backgroundColor': '#1a2332', 'color': '#e2e8f0', 'fontSize': '1.05rem', 'lineHeight': '1.7'}),
-            dbc.ModalFooter(
-                dbc.Button("Got it!", id="close-help-modal", className="ms-auto", color="primary"),
-                style={'backgroundColor': '#1a2332', 'borderTop': '1px solid #2d3748'}
-            ),
-        ], id="help-modal", size="md", is_open=False, backdrop=True),
+        dcc.Interval(id='interval', interval=2000, n_intervals=0),
 
         # === HEADER ===
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H1("MYCELIAL FINANCE", style={
-                        'fontSize': '2.5rem',
-                        'fontWeight': '700',
-                        'color': '#a855f7',  # PURPLE
-                        'letterSpacing': '1px',
-                        'marginBottom': '0.25rem'
-                    }),
-                    html.P("AI-Powered Cryptocurrency Trading System", style={
-                        'color': '#9ca3af',
-                        'fontSize': '0.95rem',
-                        'fontWeight': '400',
-                        'marginBottom': '0'
-                    })
-                ], className="text-center py-3")
-            ])
-        ], className="mb-4"),
+        dbc.Row(dbc.Col(html.Div([
+            html.H1([
+                html.I(className="fas fa-brain", style={'marginRight': '15px', 'color': COLORS['primary']}),
+                "MYCELIAL INTELLIGENCE ENGINE"
+            ], style={'fontSize': '2.5rem', 'fontWeight': '700', 'color': COLORS['text'], 'textAlign': 'center'}),
+            html.P("v9.0: The Story-Driven Analytics Platform - Understanding Your Swarm's Journey",
+                  style={'color': COLORS['text_muted'], 'fontSize': '0.95rem', 'textAlign': 'center'}),
+        ], className="py-3 mb-4"))),
 
-        # === ROW 1: KEY METRICS ===
+        # === KEY METRICS ROW (The Dashboard's "At-a-Glance" Story) ===
         dbc.Row([
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
                         html.Div([
-                            html.I(className="fas fa-wallet", style={'fontSize': '1.2rem', 'color': '#a855f7'}),
-                            html.Span("Portfolio Value", className="ms-2", style={'fontSize': '0.85rem', 'color': '#a0aec0', 'fontWeight': '500', 'textTransform': 'uppercase'}),
-                            html.I(className="fas fa-info-circle ms-2", id='help-portfolio', style={'fontSize': '0.9rem', 'color': '#6b7280', 'cursor': 'pointer'})
-                        ], className="mb-3"),
-                        html.Div(id='portfolio-value', style={'fontSize': '2.5rem', 'fontWeight': '700', 'color': '#ffffff'}),
-                        html.Div(id='portfolio-change')
+                            html.I(className="fas fa-lightbulb fa-2x", style={'color': COLORS['warning']}),
+                            dbc.Tooltip(
+                                "Total unique patterns discovered by your 100-agent swarm across all 5 product moats. "
+                                "This is your cumulative intelligence growth metric.",
+                                target="patterns-discovered-card",
+                            ),
+                        ], style={'float': 'right'}),
+                        html.H6("Patterns Discovered", style={'color': COLORS['text_muted'], 'marginBottom': '10px'}),
+                        html.H2(id='total-patterns-metric', children="0", style={'color': COLORS['warning'], 'fontWeight': '700'}),
+                        html.P(id='patterns-growth-text', children="+0 this session", style={'color': COLORS['success'], 'fontSize': '0.9rem'}),
                     ])
-                ], className="h-100", style={'backgroundColor': '#1a2332', 'border': '1px solid #2d3748', 'borderRadius': '12px'})
-            ], width=12, md=6, lg=3, className="mb-3"),
+                ], style={'backgroundColor': COLORS['card'], 'borderLeft': f'4px solid {COLORS["warning"]}'}, id="patterns-discovered-card"),
+            ], width=3),
 
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
                         html.Div([
-                            html.I(className="fas fa-heartbeat", style={'fontSize': '1.2rem', 'color': '#10b981'}),
-                            html.Span("System Status", className="ms-2", style={'fontSize': '0.85rem', 'color': '#a0aec0', 'fontWeight': '500', 'textTransform': 'uppercase'}),
-                            html.I(className="fas fa-info-circle ms-2", id='help-system', style={'fontSize': '0.9rem', 'color': '#6b7280', 'cursor': 'pointer'})
-                        ], className="mb-3"),
-                        html.Div(id='system-status')
+                            html.I(className="fas fa-heartbeat fa-2x", style={'color': COLORS['success']}),
+                            dbc.Tooltip(
+                                "Overall health of your swarm (0-100). Measures agent diversity, "
+                                "policy sharing activity, and absence of toxic behavior. HAVEN framework monitors this.",
+                                target="swarm-health-card",
+                            ),
+                        ], style={'float': 'right'}),
+                        html.H6("Swarm Health", style={'color': COLORS['text_muted'], 'marginBottom': '10px'}),
+                        html.H2(id='swarm-health-metric', children="100", style={'color': COLORS['success'], 'fontWeight': '700'}),
+                        html.P(id='swarm-health-status', children="Excellent", style={'color': COLORS['success'], 'fontSize': '0.9rem'}),
                     ])
-                ], className="h-100", style={'backgroundColor': '#1a2332', 'border': '1px solid #2d3748', 'borderRadius': '12px'})
-            ], width=12, md=6, lg=3, className="mb-3"),
+                ], style={'backgroundColor': COLORS['card'], 'borderLeft': f'4px solid {COLORS["success"]}'}, id="swarm-health-card"),
+            ], width=3),
 
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
                         html.Div([
-                            html.I(className="fas fa-shield-alt", style={'fontSize': '1.2rem', 'color': '#ef4444'}),
-                            html.Span("Risk Level", className="ms-2", style={'fontSize': '0.85rem', 'color': '#a0aec0', 'fontWeight': '500', 'textTransform': 'uppercase'}),
-                            html.I(className="fas fa-info-circle ms-2", id='help-risk', style={'fontSize': '0.9rem', 'color': '#6b7280', 'cursor': 'pointer'})
-                        ], className="mb-3"),
-                        html.Div(id='risk-level')
+                            html.I(className="fas fa-network-wired fa-2x", style={'color': COLORS['info']}),
+                            dbc.Tooltip(
+                                "Number of active agents currently learning and sharing policies. "
+                                "Includes pattern learners, data miners, and system agents.",
+                                target="active-agents-card",
+                            ),
+                        ], style={'float': 'right'}),
+                        html.H6("Active Agents", style={'color': COLORS['text_muted'], 'marginBottom': '10px'}),
+                        html.H2(id='active-agents-metric', children="109", style={'color': COLORS['info'], 'fontWeight': '700'}),
+                        html.P("6 Miners + 100 Learners + 3 System", style={'color': COLORS['text_muted'], 'fontSize': '0.9rem'}),
                     ])
-                ], className="h-100", style={'backgroundColor': '#1a2332', 'border': '1px solid #2d3748', 'borderRadius': '12px'})
-            ], width=12, md=6, lg=3, className="mb-3"),
+                ], style={'backgroundColor': COLORS['card'], 'borderLeft': f'4px solid {COLORS["info"]}'}, id="active-agents-card"),
+            ], width=3),
 
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
                         html.Div([
-                            html.I(className="fas fa-users", style={'fontSize': '1.2rem', 'color': '#f59e0b'}),
-                            html.Span("Active Agents", className="ms-2", style={'fontSize': '0.85rem', 'color': '#a0aec0', 'fontWeight': '500', 'textTransform': 'uppercase'}),
-                            html.I(className="fas fa-info-circle ms-2", id='help-agents', style={'fontSize': '0.9rem', 'color': '#6b7280', 'cursor': 'pointer'})
-                        ], className="mb-3"),
-                        html.Div(id='active-agents')
+                            html.I(className="fas fa-fire fa-2x", style={'color': COLORS['danger']}),
+                            dbc.Tooltip(
+                                "HAVEN Risk Framework: System risk level (0-100). "
+                                "85+ triggers policy contagion blocks. 10 toxic agents injected for stress testing.",
+                                target="haven-risk-card",
+                            ),
+                        ], style={'float': 'right'}),
+                        html.H6("HAVEN Risk Level", style={'color': COLORS['text_muted'], 'marginBottom': '10px'}),
+                        html.H2(id='haven-risk-metric', children="LOW", style={'color': COLORS['success'], 'fontWeight': '700'}),
+                        html.P(id='haven-risk-value', children="15%", style={'color': COLORS['text_muted'], 'fontSize': '0.9rem'}),
                     ])
-                ], className="h-100", style={'backgroundColor': '#1a2332', 'border': '1px solid #2d3748', 'borderRadius': '12px'})
-            ], width=12, md=6, lg=3, className="mb-3"),
+                ], style={'backgroundColor': COLORS['card'], 'borderLeft': f'4px solid {COLORS["danger"]}'}, id="haven-risk-card"),
+            ], width=3),
+        ], className='mb-4'),
+
+        # === TABS ===
+        dbc.Tabs(id="tabs", active_tab="tab-live-story", className="mb-4", children=[
+            dbc.Tab(label="📖 Live Story", tab_id="tab-live-story",
+                   label_style={'color': COLORS['text_muted']}, active_label_style={'color': COLORS['primary'], 'fontWeight': '600'}),
+            dbc.Tab(label="🧠 Agent Activity", tab_id="tab-agent-activity",
+                   label_style={'color': COLORS['text_muted']}, active_label_style={'color': COLORS['primary'], 'fontWeight': '600'}),
+            dbc.Tab(label="🏰 5-Pillar Moats", tab_id="tab-moats",
+                   label_style={'color': COLORS['text_muted']}, active_label_style={'color': COLORS['primary'], 'fontWeight': '600'}),
+            dbc.Tab(label="🎴 Agent Cards", tab_id="tab-agent-cards",
+                   label_style={'color': COLORS['text_muted']}, active_label_style={'color': COLORS['primary'], 'fontWeight': '600'}),
+            dbc.Tab(label="📊 Growth Analytics", tab_id="tab-analytics",
+                   label_style={'color': COLORS['text_muted']}, active_label_style={'color': COLORS['primary'], 'fontWeight': '600'}),
         ]),
+        html.Div(id="tab-content"),
 
-        # === ROW 2: PERFORMANCE CHART ===
-        dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="fas fa-chart-line me-2", style={'color': '#a855f7'}),
-                        html.Span("Portfolio Performance Over Time", style={'fontSize': '1.1rem', 'fontWeight': '600', 'color': '#ffffff'}),
-                        html.I(className="fas fa-info-circle ms-2", id='help-performance', style={'fontSize': '0.95rem', 'color': '#6b7280', 'cursor': 'pointer'})
-                    ], style={'backgroundColor': '#1a2332', 'border': 'none', 'borderBottom': '1px solid #2d3748'}),
-                    dbc.CardBody([
-                        dcc.Graph(id='performance-chart', config={'displayModeBar': False}, style={'height': '400px'})
-                    ], className="p-2")
-                ], style={'backgroundColor': '#1a2332', 'border': '1px solid #2d3748', 'borderRadius': '12px'})
-            ], width=12, className="mb-3"),
-        ]),
-
-        # === ROW 3: NETWORK & MARKET ===
-        dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="fas fa-project-diagram me-2", style={'color': '#a855f7'}),
-                        html.Span("Agent Constellation", style={'fontSize': '1.1rem', 'fontWeight': '600', 'color': '#ffffff'}),
-                        html.Small(" (rotate & explore in 3D)", className="ms-2", style={'color': '#6b7280', 'fontSize': '0.85rem'}),
-                        html.I(className="fas fa-info-circle ms-2", id='help-network', style={'fontSize': '0.95rem', 'color': '#6b7280', 'cursor': 'pointer'})
-                    ], style={'backgroundColor': '#1a2332', 'border': 'none', 'borderBottom': '1px solid #2d3748'}),
-                    dbc.CardBody([
-                        dcc.Graph(
-                            id='network-graph',
-                            config={'displayModeBar': False},
-                            style={'height': '550px', 'backgroundColor': '#000000'}
-                        ),
-                        html.Div(id='agent-status-display', className="mt-3")
-                    ], className="p-2")
-                ], style={'backgroundColor': '#1a2332', 'border': '1px solid #2d3748', 'borderRadius': '12px'})
-            ], width=12, lg=7, className="mb-3"),
-
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="fas fa-coins me-2", style={'color': '#f59e0b'}),
-                        html.Span("Live Market Prices", style={'fontSize': '1.1rem', 'fontWeight': '600', 'color': '#ffffff'}),
-                        html.I(className="fas fa-info-circle ms-2", id='help-market', style={'fontSize': '0.95rem', 'color': '#6b7280', 'cursor': 'pointer'})
-                    ], style={'backgroundColor': '#1a2332', 'border': 'none', 'borderBottom': '1px solid #2d3748'}),
-                    dbc.CardBody([
-                        html.Div(id='market-data')
-                    ], className="p-3")
-                ], className="h-100", style={'backgroundColor': '#1a2332', 'border': '1px solid #2d3748', 'borderRadius': '12px'}),
-            ], width=12, lg=5, className="mb-3"),
-        ]),
-
-        # === ROW 4: ACTIVITY FEED ===
-        dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="fas fa-stream me-2", style={'color': '#10b981'}),
-                        html.Span("Live System Activity", style={'fontSize': '1.1rem', 'fontWeight': '600', 'color': '#ffffff'}),
-                        html.I(className="fas fa-info-circle ms-2", id='help-activity', style={'fontSize': '0.95rem', 'color': '#6b7280', 'cursor': 'pointer'})
-                    ], style={'backgroundColor': '#1a2332', 'border': 'none', 'borderBottom': '1px solid #2d3748'}),
-                    dbc.CardBody([
-                        html.Div(id='activity-feed', style={
-                            'height': '300px',
-                            'overflowY': 'auto',
-                            'fontSize': '0.95rem',
-                            'lineHeight': '1.7'
-                        })
-                    ], className="p-3")
-                ], style={'backgroundColor': '#1a2332', 'border': '1px solid #2d3748', 'borderRadius': '12px'})
-            ], width=12, className="mb-3"),
-        ]),
-
-        html.Div(f"Mycelial Finance v5.0 | Session: {SESSION_ID}", className="text-center mt-3",
-                style={'color': '#4a5568', 'fontSize': '0.75rem'})
+        html.Div(f"Session {SESSION_ID} | Big Rock 23: Story-Driven Engine Active | Focus: Content, Growth, Pattern Discovery",
+                className="text-center mt-4", style={'color': COLORS['text_muted'], 'fontSize': '0.75rem'})
     ]
 )
 
 # === REDIS LISTENER ===
 def start_redis_listener(app_queue: Queue):
-    logging.info("Dashboard: Redis listener started")
+    logging.info("Story Engine v9.0: Redis listener started")
     try:
         redis_client = RedisClient()
     except Exception as e:
@@ -399,7 +266,13 @@ def start_redis_listener(app_queue: Queue):
         'market-data:*': 'market-data',
         'trade-orders': 'trade-order',
         'trade-confirmations': 'trade-confirmation',
-        'system-control': 'system-control'
+        'system-control': 'system-control',
+        'system-build-request': 'build-request',
+        'policy-data:gov': 'policy-data',
+        'corporate-data:*': 'corporate-data',
+        'repo-data:*': 'repo-data',
+        'logistics-data:*': 'logistics-data',
+        'agent-lineage-update': 'lineage-update'
     }
 
     def create_listener(pattern, msg_type):
@@ -412,7 +285,7 @@ def start_redis_listener(app_queue: Queue):
             for message in pubsub.listen():
                 try:
                     data = json.loads(message['data'])
-                    app_queue.put({'type': msg_type, 'data': data, 'channel': message['channel']})
+                    app_queue.put({'type': msg_type, 'data': data, 'channel': message['channel'], 'time': time.time()})
                 except:
                     pass
         except:
@@ -421,635 +294,776 @@ def start_redis_listener(app_queue: Queue):
             pubsub.close()
 
     for pattern, msg_type in channels.items():
-        threading.Thread(target=create_listener, args=(pattern, msg_type), daemon=True).start()
+        t = threading.Thread(target=create_listener, args=(pattern, msg_type), daemon=True)
+        t.start()
 
-# === DATA UPDATE ===
+listener_thread = threading.Thread(target=start_redis_listener, args=(message_queue,), daemon=True)
+listener_thread.start()
+logging.info("Mycelial Story Engine v9.0 Active")
+
+# === MAIN DATA UPDATE ===
 @app.callback(
-    Output('pnl-store', 'data'),
-    Output('market-store', 'data'),
-    Output('log-store', 'data'),
-    Output('pulse-store', 'data'),
-    Output('activity-store', 'data'),
-    Output('agent-actions-store', 'data'),
-    Output('agent-status-store', 'data'),
-    Input('interval', 'n_intervals'),
-    State('pnl-store', 'data'),
-    State('market-store', 'data'),
-    State('log-store', 'data'),
-    State('pulse-store', 'data'),
-    State('activity-store', 'data'),
-    State('agent-actions-store', 'data'),
-    State('agent-status-store', 'data')
+    [Output('pattern-store', 'data'),
+     Output('moat-health-store', 'data'),
+     Output('activity-log-store', 'data'),
+     Output('agent-stats-store', 'data'),
+     Output('swarm-health-store', 'data'),
+     Output('discoveries-store', 'data')],
+    [Input('interval', 'n_intervals')],
+    [State('pattern-store', 'data'),
+     State('moat-health-store', 'data'),
+     State('activity-log-store', 'data'),
+     State('agent-stats-store', 'data'),
+     State('swarm-health-store', 'data'),
+     State('discoveries-store', 'data')]
 )
-def update_data(n, pnl, market, logs, pulses, activity, agent_actions, agent_status):
-    current_time = time.time()
-    active_pulses = {k: v for k, v in pulses.items() if current_time - v['time'] < 1.0}
-    new_logs = []
-    act_counts = {'miners': 0, 'learners': 0, 'traders': 0, 'risk': 0}
+def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_health, discoveries):
+    """Process Redis messages and update all stores with narrative focus."""
 
-    if not agent_actions:
-        agent_actions = {k: [] for k in NODE_POSITIONS.keys()}
-    if not agent_status:
-        agent_status = {k: 'Idle' for k in NODE_POSITIONS.keys()}
-
+    # Process all queued messages
     while not message_queue.empty():
-        try:
-            msg = message_queue.get_nowait()
-            t = time.strftime('%H:%M:%S')
+        msg = message_queue.get()
+        msg_type = msg['type']
+        data = msg['data']
+        timestamp = datetime.now().strftime('%H:%M:%S')
 
-            if msg['type'] == 'market-data':
-                src = msg['data']['source']
-                price = float(msg['data']['data']['c'][0])
-                coin = "Bitcoin" if 'XXBTZUSD' in str(msg['channel']) else "Ethereum"
+        # Track agent activity
+        source = data.get('source', 'Unknown')
 
-                if msg['channel'] == b'market-data:XXBTZUSD':
-                    market['times'].append(t)
-                    market['btc'].append(price)
-                    market['times'] = market['times'][-50:]
-                    market['btc'] = market['btc'][-50:]
-                    active_pulses[f"{src}->PatternLearner_XXBTZUSD_3"] = {'color': '#a855f7', 'time': current_time}
-                    act_counts['miners'] += 1
-                    agent_actions.get(src, []).append({'time': t, 'action': f'Updated {coin} price: ${price:,.2f}'})
-                    agent_status[src] = f'Watching {coin}'
-                elif msg['channel'] == b'market-data:XETHZUSD':
-                    market['eth'].append(price)
-                    market['eth'] = market['eth'][-50:]
-                    active_pulses[f"{src}->PatternLearner_XETHZUSD_4"] = {'color': '#a855f7', 'time': current_time}
-                    act_counts['miners'] += 1
-                    agent_actions.get(src, []).append({'time': t, 'action': f'Updated {coin} price: ${price:,.2f}'})
-                    agent_status[src] = f'Watching {coin}'
+        # Initialize agent stats if not exists
+        if source and source != 'Unknown':
+            if source not in agent_stats:
+                agent_stats[source] = {
+                    'patterns_discovered': 0,
+                    'policy_shares': 0,
+                    'last_active': timestamp,
+                    'generation': 0,
+                    'parent': 'Genesis',
+                    'children': [],
+                    'status': 'Active'
+                }
+            agent_stats[source]['last_active'] = timestamp
 
-                new_logs.append({'time': t, 'type': 'market', 'msg': f'{coin} price updated to ${price:,.2f}', 'detail': f'The {coin} market moved to ${price:,.2f}. Our sensors detected this change and sent it to the decision-making agents.'})
+        if msg_type == 'market-data':
+            pair = data.get('pair', 'Unknown')
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'📊 Analyzed {pair} market data',
+                'color': COLORS['primary']
+            })
+            pattern_data['total_patterns'] += 1
+            moat_health['Finance'] = min(100, moat_health.get('Finance', 100) + 0.5)
+            # Track per-agent patterns
+            if source and source != 'Unknown':
+                agent_stats[source]['patterns_discovered'] += 1
+                agent_stats[source]['policy_shares'] += 1
 
-            elif msg['type'] == 'trade-order':
-                src = msg['data']['source']
-                direction = msg['data']['direction'].upper()
-                amount = msg['data']['amount']
-                pair = msg['data']['pair']
-                coin_name = "Bitcoin" if 'BTC' in pair else "Ethereum"
+        elif msg_type == 'repo-data':
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'💡 Discovered code innovation pattern',
+                'color': COLORS['success']
+            })
+            pattern_data['total_patterns'] += 1
+            moat_health['Code Innovation'] = min(100, moat_health.get('Code Innovation', 100) + 0.5)
+            if source and source != 'Unknown':
+                agent_stats[source]['patterns_discovered'] += 1
+                agent_stats[source]['policy_shares'] += 1
 
-                active_pulses[f"{src}->Trader_5"] = {'color': '#10b981', 'time': current_time}
-                act_counts['learners'] += 1
-                agent_actions.get(src, []).append({'time': t, 'action': f'Decided to {direction}: {amount} {pair}'})
-                agent_status[src] = f'Signal: {direction}'
-                agent_status['Trader_5'] = f'Executing {direction}'
+        elif msg_type == 'logistics-data':
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'🚚 Tracked logistics flow pattern',
+                'color': COLORS['warning']
+            })
+            pattern_data['total_patterns'] += 1
+            moat_health['Logistics'] = min(100, moat_health.get('Logistics', 100) + 0.5)
+            if source and source != 'Unknown':
+                agent_stats[source]['patterns_discovered'] += 1
+                agent_stats[source]['policy_shares'] += 1
 
-                new_logs.append({'time': t, 'type': 'order', 'msg': f'{direction} signal for {coin_name}!', 'detail': f'The {coin_name} Strategy Brain analyzed the price patterns and decided it\'s a good time to {direction}. It sent an order for {amount} units to the Trade Executor.'})
+        elif msg_type == 'policy-data':
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'🏛️ Analyzed government policy shift',
+                'color': COLORS['info']
+            })
+            pattern_data['total_patterns'] += 1
+            moat_health['Government'] = min(100, moat_health.get('Government', 100) + 0.5)
+            if source and source != 'Unknown':
+                agent_stats[source]['patterns_discovered'] += 1
+                agent_stats[source]['policy_shares'] += 1
 
-            elif msg['type'] == 'trade-confirmation':
-                active_pulses["Trader_5->RiskManager_6"] = {'color': '#f59e0b', 'time': current_time}
-                act_counts['traders'] += 1
-                act_counts['risk'] += 1
-                agent_actions.get('Trader_5', []).append({'time': t, 'action': 'Trade completed'})
-                agent_actions.get('RiskManager_6', []).append({'time': t, 'action': 'Checked trade safety'})
-                agent_status['Trader_5'] = 'Trade completed'
-                agent_status['RiskManager_6'] = 'Monitoring'
+        elif msg_type == 'corporate-data':
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'🏢 Mined corporate intelligence',
+                'color': COLORS['corp']
+            })
+            pattern_data['total_patterns'] += 1
+            moat_health['US Corporations'] = min(100, moat_health.get('US Corporations', 100) + 0.5)
+            if source and source != 'Unknown':
+                agent_stats[source]['patterns_discovered'] += 1
+                agent_stats[source]['policy_shares'] += 1
 
-                if msg['data']['execution_result'].get('status') == 'success':
-                    pnl['values'].append(pnl['values'][-1] + random.uniform(-50, 75))
-                    pnl['times'].append(t)
-                    pnl['values'] = pnl['values'][-100:]
-                    pnl['times'] = pnl['times'][-100:]
-                    new_logs.append({'time': t, 'type': 'confirm', 'msg': 'Trade executed successfully!', 'detail': 'The Trade Executor placed the order and it was filled. The Safety Monitor checked the trade and updated your portfolio value. Everything looks good!'})
-                else:
-                    new_logs.append({'time': t, 'type': 'error', 'msg': 'Trade failed', 'detail': 'The trade could not be completed. This could be due to insufficient funds or market conditions.'})
-        except:
-            pass
+        elif msg_type == 'build-request':
+            requester = data.get('requester', 'Unknown')
+            agent_type = data.get('agent_type', 'Unknown')
+            reason = data.get('reason', 'Unknown')
+            activity_log.append({
+                'time': timestamp,
+                'agent': requester,
+                'action': f'🔧 Requested new {agent_type}: {reason}',
+                'color': '#9333ea'
+            })
+            discoveries.append({
+                'time': timestamp,
+                'type': 'Evolution',
+                'description': f'{requester} requested {agent_type}',
+                'importance': 'High'
+            })
 
-    for agent_id in agent_actions:
-        agent_actions[agent_id] = agent_actions[agent_id][-20:]
+        # Track pattern discoveries over time
+        pattern_data['times'].append(timestamp)
+        pattern_data['counts'].append(pattern_data['total_patterns'])
+        if len(pattern_data['times']) > 50:
+            pattern_data['times'] = pattern_data['times'][-50:]
+            pattern_data['counts'] = pattern_data['counts'][-50:]
 
-    logs.extend(new_logs)
-    logs = logs[-30:]
+    # Limit activity log size
+    if len(activity_log) > 100:
+        activity_log = activity_log[-100:]
 
-    return pnl, market, logs, active_pulses, act_counts, agent_actions, agent_status
+    # Calculate swarm health (based on moat health average)
+    avg_moat_health = sum(moat_health.values()) / len(moat_health)
+    swarm_health['value'] = avg_moat_health
+    swarm_health['history'].append(avg_moat_health)
+    if len(swarm_health['history']) > 50:
+        swarm_health['history'] = swarm_health['history'][-50:]
 
-# === REMAINING CALLBACKS ===
+    return pattern_data, moat_health, activity_log, agent_stats, swarm_health, discoveries
+
+# === KEY METRICS UPDATES ===
 @app.callback(
-    Output('portfolio-value', 'children'),
-    Output('portfolio-change', 'children'),
-    Input('pnl-store', 'data')
+    [Output('total-patterns-metric', 'children'),
+     Output('patterns-growth-text', 'children'),
+     Output('swarm-health-metric', 'children'),
+     Output('swarm-health-status', 'children'),
+     Output('haven-risk-metric', 'children'),
+     Output('haven-risk-value', 'children')],
+    [Input('pattern-store', 'data'),
+     Input('swarm-health-store', 'data')]
 )
-def update_portfolio(data):
-    val = data['values'][-1]
-    initial = data.get('initial', 10000)
-    change = val - initial
-    pct = (change / initial) * 100
-    color = '#10b981' if change >= 0 else '#ef4444'
-    icon = 'arrow-up' if change >= 0 else 'arrow-down'
+def update_key_metrics(pattern_data, swarm_health):
+    total = pattern_data['total_patterns']
+    growth_text = f"+{total} this session"
+
+    health_val = swarm_health['value']
+    health_display = f"{health_val:.0f}"
+    if health_val >= 90:
+        health_status = "Excellent"
+        health_color = COLORS['success']
+    elif health_val >= 70:
+        health_status = "Good"
+        health_color = COLORS['info']
+    else:
+        health_status = "Needs Attention"
+        health_color = COLORS['warning']
+
+    # Simulate HAVEN risk (low most of the time)
+    risk = random.uniform(10, 40) if random.random() > 0.05 else random.uniform(85, 95)
+    if risk < 50:
+        risk_level = "LOW"
+        risk_color = COLORS['success']
+    elif risk < 85:
+        risk_level = "MEDIUM"
+        risk_color = COLORS['warning']
+    else:
+        risk_level = "HIGH"
+        risk_color = COLORS['danger']
+
     return (
-        f"${val:,.2f}",
-        html.Div([
-            html.I(className=f"fas fa-{icon} me-2", style={'color': color}),
-            html.Span(f"{change:+,.2f} ({pct:+.2f}%)", style={'color': color, 'fontSize': '1rem', 'fontWeight': '600'})
-        ], className="mt-2")
+        f"{total:,}",
+        growth_text,
+        health_display,
+        html.Span(health_status, style={'color': health_color}),
+        html.Span(risk_level, style={'color': risk_color}),
+        f"{risk:.0f}%"
     )
 
-@app.callback(Output('system-status', 'children'), Input('activity-store', 'data'))
-def update_status(activity):
-    total = sum(activity.values())
-    status = "OPERATIONAL" if total > 0 else "STANDBY"
-    color = '#10b981' if total > 0 else '#6b7280'
-    return html.Div([
-        html.H3(status, style={'color': color, 'fontWeight': '700', 'fontSize': '1.6rem', 'marginBottom': '0.5rem'}),
-        html.Div(f"{total} events/sec", style={'color': '#9ca3af', 'fontSize': '0.9rem'})
-    ])
+# === TAB RENDERER ===
+@app.callback(
+    Output('tab-content', 'children'),
+    [Input('tabs', 'active_tab')]
+)
+def render_tab_content(active_tab):
 
-@app.callback(Output('risk-level', 'children'), Input('pnl-store', 'data'))
-def update_risk(data):
-    val = data['values'][-1]
-    initial = data.get('initial', 10000)
-    dd = max(0, ((initial - val) / initial) * 100)
-    if dd < 3: status, color = "LOW", '#10b981'
-    elif dd < 7: status, color = "MODERATE", '#f59e0b'
-    else: status, color = "HIGH", '#ef4444'
-    return html.Div([
-        html.H3(status, style={'color': color, 'fontWeight': '700', 'fontSize': '1.6rem', 'marginBottom': '0.5rem'}),
-        html.Div(f"Drawdown: {dd:.1f}%", style={'color': '#9ca3af', 'fontSize': '0.9rem'})
-    ])
+    if active_tab == 'tab-live-story':
+        return dbc.Container(fluid=True, children=[
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("📖 The Pattern Discovery Story", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            dcc.Graph(id='pattern-timeline'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=8),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("🔥 Live Agent Activity", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            html.Div(id='live-activity-feed', style={
+                                'maxHeight': '400px',
+                                'overflowY': 'scroll',
+                                'fontFamily': 'monospace',
+                                'fontSize': '0.85rem'
+                            })
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=4),
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("💡 Recent Discoveries", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            html.Div(id='discoveries-feed')
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ], className='mt-3'),
+        ])
 
-@app.callback(Output('active-agents', 'children'), Input('activity-store', 'data'))
-def update_agents(activity):
-    active = sum(1 for v in activity.values() if v > 0)
-    return html.Div([
-        html.H3(f"{active}/6", style={'color': '#f59e0b', 'fontWeight': '700', 'fontSize': '1.6rem', 'marginBottom': '0.5rem'}),
-        html.Div("agents working", style={'color': '#9ca3af', 'fontSize': '0.9rem'})
-    ])
+    elif active_tab == 'tab-agent-activity':
+        return dbc.Container(fluid=True, children=[
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("🧠 Agent Performance Leaderboard", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            dcc.Graph(id='agent-leaderboard'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=6),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("📡 Agent Communication Network", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            dcc.Graph(id='agent-network'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=6),
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("📊 What Each Agent Type Is Doing", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            html.Div(id='agent-type-summary')
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ], className='mt-3'),
+        ])
 
-@app.callback(Output('performance-chart', 'figure'), Input('pnl-store', 'data'))
-def update_chart(data):
+    elif active_tab == 'tab-moats':
+        return dbc.Container(fluid=True, children=[
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("🏰 5-Pillar Moat Health", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            dcc.Graph(id='moat-health-chart'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H6("💰 Finance Moat", style={'color': COLORS['primary']}),
+                            html.Div(id='finance-moat-detail'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=4),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H6("💻 Code Innovation Moat", style={'color': COLORS['success']}),
+                            html.Div(id='code-moat-detail'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=4),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H6("🚚 Logistics Moat", style={'color': COLORS['warning']}),
+                            html.Div(id='logistics-moat-detail'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=4),
+            ], className='mt-3'),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H6("🏛️ Government Moat", style={'color': COLORS['info']}),
+                            html.Div(id='govt-moat-detail'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=6),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H6("🏢 US Corporations Moat", style={'color': COLORS['corp']}),
+                            html.Div(id='corp-moat-detail'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=6),
+            ], className='mt-3'),
+        ])
+
+    elif active_tab == 'tab-agent-cards':
+        return dbc.Container(fluid=True, children=[
+            dbc.Row([
+                dbc.Col([
+                    html.Label("Select an agent to view their story:", style={'color': COLORS['text'], 'fontWeight': '600'}),
+                    dcc.Dropdown(
+                        id='agent-selector',
+                        options=[{'label': f"{info['name']} ({aid}) - {info['product']}", 'value': aid}
+                                for aid, info in AGENT_INFO.items()],
+                        value='SwarmBrain_7',
+                        style={'backgroundColor': COLORS['card'], 'color': '#000'}
+                    ),
+                ], width=12),
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody(id='agent-card-display')
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ], className='mt-3'),
+        ])
+
+    elif active_tab == 'tab-analytics':
+        return dbc.Container(fluid=True, children=[
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("📈 Swarm Health Over Time", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            dcc.Graph(id='swarm-health-chart'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=6),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("🎯 Interestingness Distribution", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            dcc.Graph(id='interestingness-dist'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=6),
+            ]),
+        ])
+
+    return html.Div("Select a tab")
+
+# === PATTERN TIMELINE ===
+@app.callback(
+    Output('pattern-timeline', 'figure'),
+    [Input('pattern-store', 'data')]
+)
+def update_pattern_timeline(pattern_data):
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=data['times'], y=data['values'], mode='lines',
-        line={'color': '#a855f7', 'width': 3}, fill='tozeroy',
-        fillcolor='rgba(168,85,247,0.1)'
+        x=pattern_data.get('times', []),
+        y=pattern_data.get('counts', []),
+        mode='lines+markers',
+        line=dict(color=COLORS['warning'], width=3),
+        marker=dict(size=6, color=COLORS['warning']),
+        fill='tozeroy',
+        fillcolor=f'rgba(245, 158, 11, 0.2)',
+        name='Patterns'
     ))
-    # Enhanced Y-axis stability: ensure chart never jumps around from small P&L changes
-    INITIAL_PORTFOLIO = 10000
-    MIN_RANGE = 500  # Minimum $500 range for visual stability
-
-    y_min, y_max = min(data['values']), max(data['values'])
-    y_range = max(MIN_RANGE, y_max - y_min)
-
-    # Always include initial portfolio value with comfortable padding
-    y_center = (y_min + y_max) / 2
-    half_range = y_range / 2
-    axis_min = min(y_center - half_range, INITIAL_PORTFOLIO - MIN_RANGE/2)
-    axis_max = max(y_center + half_range, INITIAL_PORTFOLIO + MIN_RANGE/2)
-
-    # Add 15% padding for breathing room
-    total_range = axis_max - axis_min
-    padding = total_range * 0.15
 
     fig.update_layout(
-        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=60, r=20, t=20, b=50),
-        xaxis=dict(title=dict(text="Time", font=dict(size=12, color='#9ca3af')),
-                   showgrid=True, gridcolor='rgba(255,255,255,0.05)', fixedrange=True,
-                   tickfont=dict(size=11, color='#6b7280')),
-        yaxis=dict(title=dict(text="Portfolio Value ($)", font=dict(size=12, color='#9ca3af')),
-                   showgrid=True, gridcolor='rgba(255,255,255,0.05)',
-                   range=[axis_min - padding, axis_max + padding], fixedrange=True,
-                   tickfont=dict(size=11, color='#6b7280')),
-        showlegend=False, height=400, font=dict(color='#e2e8f0', family='Inter')
+        title=dict(text="Cumulative Pattern Discovery Timeline", font=dict(color=COLORS['text'], size=16)),
+        plot_bgcolor=COLORS['card'],
+        paper_bgcolor=COLORS['card'],
+        font=dict(color=COLORS['text_muted']),
+        xaxis=dict(title='Time', gridcolor=COLORS['border']),
+        yaxis=dict(title='Total Patterns Discovered', gridcolor=COLORS['border']),
+        margin=dict(l=40, r=20, t=60, b=40),
     )
     return fig
 
-@app.callback(Output('network-graph', 'figure'), Input('pulse-store', 'data'))
-def update_network(pulses):
-    """
-    Creates a BEAUTIFUL 3D orbital solar system visualization using physics-based orbits.
-    Adapted from production-quality code: https://thepythoncodingbook.com/2021/12/11/simulating-3d-solar-system-python-matplotlib/
-    """
-    import math
-    import time
-
-    # Get current time for orbital animation
-    t = time.time() / 5  # Slow down orbital speed
-
-    # Query Redis to get ALL active agents
-    try:
-        redis_conn = RedisClient()
-        all_keys = redis_conn.connection.keys('agent:*') if redis_conn.connection else []
-        active_agents = [key.decode('utf-8').replace('agent:', '') for key in all_keys]
-    except:
-        active_agents = []
-
-    # If no Redis data, fall back to detecting from model
-    if not active_agents:
-        active_agents = ['DataMiner_XXBTZUSD_1', 'DataMiner_XETHZUSD_2', 'TradingAgent_104', 'RiskManagementAgent_105']
-        for i in range(3, 103):
-            active_agents.append(f'PatternLearner_XXBTZUSD_{i}')
-        active_agents.append('PatternLearner_XETHZUSD_103')
-
-    # Categorize agents by type
-    data_miners = [a for a in active_agents if 'DataMiner' in a]
-    pattern_learners = [a for a in active_agents if 'PatternLearner' in a]
-    traders = [a for a in active_agents if 'TradingAgent' in a]
-    risk_managers = [a for a in active_agents if 'RiskManagement' in a]
-
-    # Create orbital positions using circular orbit physics
-    def create_orbit(agent_index, total_agents, orbit_layer):
-        """
-        Create circular orbit position using parametric equations.
-        Based on Kepler's laws: x = r*cos(θ), y = r*sin(θ), z = slight tilt
-        """
-        # Orbital parameters
-        radius = 8 + (orbit_layer * 4)  # Orbital distance from sun
-        speed = 0.5 / radius  # Outer orbits move slower (Kepler's 3rd law)
-        phase = (agent_index / total_agents) * 2 * math.pi  # Distribute evenly around orbit
-        tilt = math.sin(agent_index * 0.5) * 2  # Slight z-axis variation for 3D effect
-
-        # Calculate position at current time
-        angle = (t * speed) + phase
-        x = radius * math.cos(angle)
-        y = radius * math.sin(angle)
-        z = tilt * math.sin(angle * 0.3)  # Gentle z-oscillation
-
-        return [x, y, z]
-
-    # Create separate traces for each agent type
-    traces = []
-
-    # 1. Pattern Learners - Purple glowing swarm in multiple orbital rings
-    if pattern_learners:
-        learner_positions = []
-        for i, agent in enumerate(pattern_learners):
-            orbit_layer = int(i / 20)  # 20 agents per orbital ring
-            pos = create_orbit(i, len(pattern_learners), orbit_layer + 1)
-            learner_positions.append(pos)
-
-        x, y, z = zip(*learner_positions)
-        traces.append(go.Scatter3d(
-            x=x, y=y, z=z,
-            mode='markers',
-            name='Pattern Learners',
-            hovertext=[f'{agent}<br>Pattern Learner<br>Orbital Swarm' for agent in pattern_learners],
-            hoverinfo='text',
-            marker=dict(
-                size=8,
-                color='#a855f7',
-                opacity=0.85,
-                line=dict(color='#e9d5ff', width=2),
-                symbol='circle'
-            )
-        ))
-
-    # 2. Trading Executor - GIANT golden sun at center (stationary)
-    if traders:
-        traces.append(go.Scatter3d(
-            x=[0], y=[0], z=[0],
-            mode='markers+text',
-            name='Trading Executor',
-            text=[''],
-            hovertext=[f'{traders[0]}<br>Trading Executor<br>Central Sun'],
-            hoverinfo='text',
-            marker=dict(
-                size=40,
-                color='#fbbf24',
-                opacity=1.0,
-                line=dict(color='#fef3c7', width=6),
-                symbol='diamond'
-            )
-        ))
-
-    # 3. Data Miners - Bright blue sensor stars in close orbit
-    if data_miners:
-        sensor_positions = []
-        for i, agent in enumerate(data_miners):
-            pos = create_orbit(i, len(data_miners), 0.5)  # Close orbit
-            sensor_positions.append(pos)
-
-        x, y, z = zip(*sensor_positions)
-        traces.append(go.Scatter3d(
-            x=x, y=y, z=z,
-            mode='markers+text',
-            name='Data Sensors',
-            text=['BTC' if 'XXBTZUSD' in a else 'ETH' for a in data_miners],
-            hovertext=[f'{agent}<br>Market Sensor' for agent in data_miners],
-            hoverinfo='text',
-            marker=dict(
-                size=15,
-                color='#3b82f6',
-                opacity=0.9,
-                line=dict(color='#93c5fd', width=3),
-                symbol='circle'
-            ),
-            textfont=dict(color='#93c5fd', size=10),
-            textposition='top center'
-        ))
-
-    # 4. Risk Manager - Red guardian star in polar orbit
-    if risk_managers:
-        # Polar orbit (perpendicular to main orbital plane)
-        angle = t * 0.3
-        x_pos = 10 * math.sin(angle)
-        z_pos = 10 * math.cos(angle)
-
-        traces.append(go.Scatter3d(
-            x=[x_pos], y=[0], z=[z_pos],
-            mode='markers+text',
-            name='Risk Guardian',
-            text=['⚠'],
-            hovertext=[f'{risk_managers[0]}<br>Risk Manager<br>Polar Orbit Guardian'],
-            hoverinfo='text',
-            marker=dict(
-                size=18,
-                color='#ef4444',
-                opacity=0.95,
-                line=dict(color='#fecaca', width=4),
-                symbol='square'
-            ),
-            textfont=dict(color='#fecaca', size=14),
-            textposition='top center'
-        ))
-
-    # Create the figure
-    fig = go.Figure(data=traces)
-
-    # BEAUTIFUL DEEP SPACE - NO AXES, SMOOTH ORBITS
-    fig.update_layout(
-        scene=dict(
-            xaxis=dict(visible=False, showgrid=False, zeroline=False, showbackground=False),
-            yaxis=dict(visible=False, showgrid=False, zeroline=False, showbackground=False),
-            zaxis=dict(visible=False, showgrid=False, zeroline=False, showbackground=False),
-            bgcolor='#000000',
-            camera=dict(
-                eye=dict(x=1.5, y=1.5, z=1.2),
-                center=dict(x=0, y=0, z=0)
-            ),
-            aspectmode='cube'  # Ensures spherical orbits stay circular
-        ),
-        paper_bgcolor='#000000',
-        plot_bgcolor='#000000',
-        margin=dict(l=0, r=0, t=0, b=0),
-        showlegend=False,
-        height=550,
-        uirevision='constant'  # Maintains zoom/pan state across updates
-    )
-
-    return fig
-
+# === LIVE ACTIVITY FEED ===
 @app.callback(
-    Output('agent-status-display', 'children'),
-    Input('agent-status-store', 'data')
+    Output('live-activity-feed', 'children'),
+    [Input('activity-log-store', 'data')]
 )
-def update_agent_status_display(agent_status):
-    if not agent_status:
-        return html.Div("Agents initializing...", style={'color': '#6b7280', 'fontSize': '0.9rem'})
+def update_activity_feed(activity_log):
+    if not activity_log:
+        return html.P("Waiting for agent activity...", style={'color': COLORS['text_muted']})
 
-    # Group agents by status/signal
-    groups = {
-        'BUY Signals': [],
-        'SELL Signals': [],
-        'Active': [],
-        'Idle': []
-    }
+    feed_items = []
+    for item in reversed(activity_log[-30:]):
+        feed_items.append(html.Div([
+            html.Span(f"[{item['time']}] ", style={'color': COLORS['text_muted']}),
+            html.Span(f"{item['agent']}: ", style={'color': COLORS['info'], 'fontWeight': '600'}),
+            html.Span(item['action'], style={'color': item['color']}),
+        ], style={'marginBottom': '0.5rem'}))
 
-    for agent_id, status in agent_status.items():
-        info = AGENT_INFO.get(agent_id, {})
-        name = info.get('name', agent_id.split('_')[0])
-        color = info.get('color', '#a855f7')
+    return feed_items
 
-        agent_item = html.Div([
-            html.Span("● ", style={'color': color, 'fontSize': '0.9rem', 'marginRight': '0.5rem'}),
-            html.Span(name, style={'color': '#e2e8f0', 'fontSize': '0.85rem', 'cursor': 'pointer'}),
-        ], style={
-            'marginBottom': '0.3rem',
-            'padding': '0.25rem 0.5rem',
-            'borderRadius': '4px',
-            'cursor': 'pointer',
-            'transition': 'background-color 0.2s'
-        }, className='agent-list-item', id={'type': 'agent-item', 'index': agent_id})
-
-        if 'BUY' in status:
-            groups['BUY Signals'].append(agent_item)
-        elif 'SELL' in status:
-            groups['SELL Signals'].append(agent_item)
-        elif 'Idle' in status or 'Waiting' in status:
-            groups['Idle'].append(agent_item)
-        else:
-            groups['Active'].append(agent_item)
-
-    # Create collapsible sections
-    sections = []
-    colors = {
-        'BUY Signals': '#10b981',
-        'SELL Signals': '#ef4444',
-        'Active': '#a855f7',
-        'Idle': '#6b7280'
-    }
-
-    for group_name, items in groups.items():
-        if items:
-            count = len(items)
-            sections.append(
-                html.Div([
-                    html.Div([
-                        html.I(className="fas fa-chevron-down me-2", style={'fontSize': '0.75rem', 'color': colors[group_name]}),
-                        html.Span(f"{group_name} ({count})",
-                                 style={'color': colors[group_name], 'fontWeight': '600', 'fontSize': '0.9rem'})
-                    ], style={
-                        'marginBottom': '0.5rem',
-                        'padding': '0.5rem',
-                        'backgroundColor': 'rgba(255,255,255,0.03)',
-                        'borderRadius': '6px',
-                        'borderLeft': f'3px solid {colors[group_name]}'
-                    }),
-                    html.Div(items[:10] if count > 10 else items,  # Show max 10 per group
-                            style={'paddingLeft': '1rem', 'marginBottom': '1rem'}),
-                    html.Div(f"+ {count - 10} more...",
-                            style={'color': '#6b7280', 'fontSize': '0.75rem', 'paddingLeft': '1rem', 'fontStyle': 'italic'})
-                    if count > 10 else html.Div()
-                ], style={'marginBottom': '0.75rem'})
-            )
-
-    return html.Div(sections)
-
+# === DISCOVERIES FEED ===
 @app.callback(
-    Output("agent-modal", "is_open"),
-    Output("modal-title", "children"),
-    Output("modal-body", "children"),
-    Input("network-graph", "clickData"),
-    Input({"type": "agent-item", "index": dash.dependencies.ALL}, "n_clicks"),
-    Input("close-modal", "n_clicks"),
-    State("agent-modal", "is_open"),
-    State('agent-actions-store', 'data'),
-    State('agent-status-store', 'data')
+    Output('discoveries-feed', 'children'),
+    [Input('discoveries-store', 'data')]
 )
-def toggle_agent_modal(clickData, list_clicks, close_clicks, is_open, agent_actions, agent_status):
-    # CRITICAL FIX: Prevent auto-trigger on page load or when no actual click happened
-    if not ctx.triggered_id:
-        return False, "", ""
-
-    # Also prevent if triggered by None clicks in list
-    if ctx.triggered_id and isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get('type') == 'agent-item':
-        # Find which specific item was clicked
-        trigger_idx = ctx.triggered_id.get('index')
-        if list_clicks and trigger_idx is not None:
-            idx = next((i for i, click in enumerate(list_clicks) if click is not None), None)
-            if idx is None:
-                return False, "", ""
-
-    if ctx.triggered_id == "close-modal":
-        return False, "", ""
-
-    agent_id = None
-
-    # Check if clicked from network graph
-    if clickData and ctx.triggered_id == "network-graph":
-        # Get the curve number and point index to determine which agent was clicked
-        point = clickData['points'][0]
-        curve_num = point.get('curveNumber', 0)
-        point_idx = point.get('pointIndex', 0)
-
-        # Try to extract agent info from hover data
-        if 'text' in point:
-            agent_text = point['text']
-            # Match against our agent status to find the ID
-            for aid, status in (agent_status or {}).items():
-                info = AGENT_INFO.get(aid, {})
-                if info.get('name') == agent_text or agent_text in aid:
-                    agent_id = aid
-                    break
-
-    # Check if clicked from list
-    elif ctx.triggered_id and isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get('type') == 'agent-item':
-        agent_id = ctx.triggered_id['index']
-
-    if not agent_id:
-        return dash.no_update, dash.no_update, dash.no_update
-
-    # Get agent info
-    info = AGENT_INFO.get(agent_id, {
-        'type': 'Pattern Learner',
-        'name': agent_id.split('_')[0],
-        'description': 'This agent analyzes market patterns using moving average crossovers.',
-        'what_it_does': ['Monitors price movements', 'Generates trading signals', 'Uses SMA crossover strategy'],
-        'connections': []
-    })
-
-    recent_actions = agent_actions.get(agent_id, [])[-10:] if agent_actions else []
-    current_status = agent_status.get(agent_id, 'Unknown') if agent_status else 'Unknown'
-
-    modal_content = html.Div([
-        dbc.Badge(info['type'], color="primary", className="mb-3"),
-        dbc.Badge(f"Status: {current_status}", color="secondary", className="mb-3 ms-2"),
-        html.P(info['description'], style={'color': '#cbd5e0', 'lineHeight': '1.7', 'marginBottom': '1.5rem'}),
-        html.H5("What This Agent Does:", style={'color': '#a855f7', 'fontSize': '1rem', 'fontWeight': '600', 'marginBottom': '0.75rem'}),
-        html.Ul([html.Li(r, style={'color': '#cbd5e0', 'marginBottom': '0.5rem'}) for r in info.get('what_it_does', [])],
-               style={'paddingLeft': '1.5rem', 'marginBottom': '1.5rem'}),
-        html.H5("Connected To:", style={'color': '#a855f7', 'fontSize': '1rem', 'fontWeight': '600', 'marginBottom': '0.75rem'}),
-        html.Div([dbc.Badge(c.split('_')[0], color="secondary", className="me-2 mb-2") for c in info.get('connections', [])], style={'marginBottom': '1.5rem'}),
-        html.H5("Recent Activity:", style={'color': '#a855f7', 'fontSize': '1rem', 'fontWeight': '600', 'marginBottom': '0.75rem'}),
-        html.Div([
-            html.Div([
-                html.Span(f"[{action['time']}]", style={'color': '#6b7280', 'fontSize': '0.85rem', 'marginRight': '0.5rem'}),
-                html.Span(action['action'], style={'color': '#cbd5e0', 'fontSize': '0.9rem'})
-            ], style={'marginBottom': '0.5rem'})
-            for action in reversed(recent_actions)
-        ]) if recent_actions else html.P("No recent activity", style={'color': '#6b7280', 'fontStyle': 'italic'})
-    ])
-    return True, info['name'], modal_content
-
-@app.callback(
-    Output("help-modal", "is_open"),
-    Output("help-modal-title", "children"),
-    Output("help-modal-body", "children"),
-    Input("help-portfolio", "n_clicks"),
-    Input("help-system", "n_clicks"),
-    Input("help-risk", "n_clicks"),
-    Input("help-agents", "n_clicks"),
-    Input("help-performance", "n_clicks"),
-    Input("help-network", "n_clicks"),
-    Input("help-market", "n_clicks"),
-    Input("help-activity", "n_clicks"),
-    Input("close-help-modal", "n_clicks"),
-    State("help-modal", "is_open")
-)
-def toggle_help_modal(*args):
-    if ctx.triggered_id == "close-help-modal":
-        return False, "", ""
-
-    help_map = {
-        'help-portfolio': 'portfolio',
-        'help-system': 'system_status',
-        'help-risk': 'risk',
-        'help-agents': 'agents',
-        'help-performance': 'performance',
-        'help-network': 'network',
-        'help-market': 'market',
-        'help-activity': 'activity'
-    }
-
-    if ctx.triggered_id in help_map:
-        section = SECTION_HELP[help_map[ctx.triggered_id]]
-        return True, section['title'], section['content']
-
-    return False, "", ""
-
-@app.callback(Output('market-data', 'children'), Input('market-store', 'data'))
-def update_market(data):
-    btc = data['btc'][-1] if data['btc'] else 0
-    eth = data['eth'][-1] if data['eth'] else 0
-    btc_chg = ((data['btc'][-1] - data['btc'][0]) / data['btc'][0] * 100) if len(data['btc']) > 1 else 0
-    eth_chg = ((data['eth'][-1] - data['eth'][0]) / data['eth'][0] * 100) if len(data['eth']) > 1 else 0
-
-    return html.Div([
-        html.Div([
-            html.Div([
-                html.I(className="fab fa-bitcoin", style={'fontSize': '2.5rem', 'color': '#f7931a'}),
-                html.Div([
-                    html.H6("Bitcoin (BTC)", className="mb-1", style={'color': '#9ca3af', 'fontWeight': '500'}),
-                    html.H3(f"${btc:,.2f}", className="mb-2", style={'fontWeight': '700', 'color': '#ffffff'}),
-                    dbc.Badge(f"{btc_chg:+.2f}%", color="success" if btc_chg >= 0 else "danger", style={'padding': '0.5rem 1rem'})
-                ], className="ms-3")
-            ], className="d-flex align-items-center mb-4"),
-        ]),
-        html.Div([
-            html.Div([
-                html.I(className="fab fa-ethereum", style={'fontSize': '2.5rem', 'color': '#627eea'}),
-                html.Div([
-                    html.H6("Ethereum (ETH)", className="mb-1", style={'color': '#9ca3af', 'fontWeight': '500'}),
-                    html.H3(f"${eth:,.2f}", className="mb-2", style={'fontWeight': '700', 'color': '#ffffff'}),
-                    dbc.Badge(f"{eth_chg:+.2f}%", color="success" if eth_chg >= 0 else "danger", style={'padding': '0.5rem 1rem'})
-                ], className="ms-3")
-            ], className="d-flex align-items-center"),
-        ])
-    ])
-
-@app.callback(Output('activity-feed', 'children'), Input('log-store', 'data'))
-def update_feed(logs):
-    if not logs:
-        return html.Div([
-            html.I(className="fas fa-clock me-2", style={'color': '#6b7280'}),
-            html.Span("Waiting for system activity...", style={'color': '#6b7280'})
-        ])
+def update_discoveries_feed(discoveries):
+    if not discoveries:
+        return html.P("No major discoveries yet...", style={'color': COLORS['text_muted']})
 
     items = []
-    for entry in reversed(logs[-15:]):
-        if entry['type'] == 'market': icon, color = 'chart-line', '#a855f7'
-        elif entry['type'] == 'order': icon, color = 'bolt', '#10b981'
-        elif entry['type'] == 'confirm': icon, color = 'check-circle', '#10b981'
-        elif entry['type'] == 'error': icon, color = 'exclamation-triangle', '#ef4444'
-        else: icon, color = 'info-circle', '#6b7280'
+    for disc in reversed(discoveries[-10:]):
+        items.append(dbc.Alert([
+            html.H6(disc['type'], style={'marginBottom': '5px'}),
+            html.P(disc['description'], style={'marginBottom': '0'}),
+            html.Small(f"Importance: {disc['importance']} | {disc['time']}", style={'color': COLORS['text_muted']})
+        ], color='info', style={'marginBottom': '10px'}))
 
-        items.append(html.Div([
-            html.Div([
-                html.Span(f"[{entry['time']}]", style={'color': '#4a5568', 'fontWeight': '600', 'marginRight': '0.75rem'}),
-                html.I(className=f"fas fa-{icon}", style={'color': color, 'marginRight': '0.75rem'}),
-                html.Span(entry['msg'], style={'color': '#ffffff', 'fontWeight': '600'})
-            ], style={'marginBottom': '0.25rem'}),
-            html.Div(entry.get('detail', ''), style={'color': '#9ca3af', 'fontSize': '0.9rem', 'marginLeft': '6rem', 'marginBottom': '1rem'})
-        ], style={'marginBottom': '0.75rem'}))
+    return items
 
-    return html.Div(items)
+# === AGENT LEADERBOARD ===
+@app.callback(
+    Output('agent-leaderboard', 'figure'),
+    [Input('interval', 'n_intervals')]
+)
+def update_agent_leaderboard(n):
+    # Simulate interestingness scores
+    agents = list(AGENT_INFO.keys())[:15]
+    scores = []
+    for agent_id in agents:
+        mock_data = {
+            'id': agent_id,
+            'vector': [random.random() for _ in range(4)],
+            'score': random.uniform(0.4, 0.95),
+            'parent_id': 'Genesis' if random.random() > 0.6 else f'SwarmBrain_{random.randint(7, 50)}',
+            'generation': random.randint(0, 5)
+        }
+        interest_score = calculate_interestingness(mock_data, {})
+        scores.append((agent_id, interest_score))
+
+    scores.sort(key=lambda x: x[1], reverse=True)
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=[AGENT_INFO[a[0]]['name'] for a in scores],
+        x=[a[1] for a in scores],
+        orientation='h',
+        marker=dict(color=[a[1] for a in scores], colorscale='Purples', showscale=False),
+        text=[f"{a[1]:.1f}" for a in scores],
+        textposition='outside'
+    ))
+
+    fig.update_layout(
+        title=dict(text="Top 15 Most Interesting Agents (5-Component Score)", font=dict(color=COLORS['text'], size=14)),
+        plot_bgcolor=COLORS['card'],
+        paper_bgcolor=COLORS['card'],
+        font=dict(color=COLORS['text_muted']),
+        xaxis=dict(title='Interestingness Score (0-100)', gridcolor=COLORS['border']),
+        yaxis=dict(gridcolor=COLORS['border']),
+        margin=dict(l=120, r=20, t=60, b=40),
+        height=500
+    )
+    return fig
+
+# === AGENT NETWORK ===
+@app.callback(
+    Output('agent-network', 'figure'),
+    [Input('interval', 'n_intervals')]
+)
+def update_agent_network(n):
+    agents = list(AGENT_INFO.keys())[:20]
+    num_agents = len(agents)
+
+    # Circular layout
+    x_pos = [math.cos(2 * math.pi * i / num_agents) for i in range(num_agents)]
+    y_pos = [math.sin(2 * math.pi * i / num_agents) for i in range(num_agents)]
+
+    fig = go.Figure()
+
+    # Add edges
+    for i in range(num_agents - 1):
+        fig.add_trace(go.Scatter(
+            x=[x_pos[i], x_pos[i+1]],
+            y=[y_pos[i], y_pos[i+1]],
+            mode='lines',
+            line=dict(color=COLORS['border'], width=1),
+            showlegend=False,
+            hoverinfo='none'
+        ))
+
+    # Add nodes
+    fig.add_trace(go.Scatter(
+        x=x_pos,
+        y=y_pos,
+        mode='markers+text',
+        marker=dict(size=15, color=COLORS['primary'], line=dict(color=COLORS['text'], width=2)),
+        text=[a.split('_')[-1][:3] for a in agents],
+        textposition='top center',
+        textfont=dict(color=COLORS['text'], size=9),
+        hovertext=[AGENT_INFO[a]['name'] for a in agents],
+        hoverinfo='text',
+        showlegend=False
+    ))
+
+    fig.update_layout(
+        title=dict(text="Agent Policy Sharing Network", font=dict(color=COLORS['text'], size=14)),
+        plot_bgcolor=COLORS['card'],
+        paper_bgcolor=COLORS['card'],
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        margin=dict(l=20, r=20, t=60, b=20),
+        height=500
+    )
+    return fig
+
+# === AGENT TYPE SUMMARY ===
+@app.callback(
+    Output('agent-type-summary', 'children'),
+    [Input('interval', 'n_intervals')]
+)
+def update_agent_type_summary(n):
+    summary = [
+        {'icon': 'fa-brain', 'type': 'Pattern Learners (100)', 'activity': 'Analyzing data streams, discovering correlations, sharing policies', 'color': COLORS['primary']},
+        {'icon': 'fa-search', 'type': 'Data Miners (6)', 'activity': 'Collecting data from 5 product moats: Finance, Code, Logistics, Gov, Corp', 'color': COLORS['success']},
+        {'icon': 'fa-shield-alt', 'type': 'HAVEN Guardian (1)', 'activity': 'Monitoring system risk, blocking policy contagion at 85% threshold', 'color': COLORS['danger']},
+        {'icon': 'fa-cogs', 'type': 'Builder (1)', 'activity': 'Autonomously creating new specialized agents when gaps detected', 'color': '#9333ea'},
+        {'icon': 'fa-bolt', 'type': 'Executor (1)', 'activity': 'Executing high-confidence pattern predictions', 'color': '#fbbf24'},
+    ]
+
+    items = []
+    for s in summary:
+        items.append(dbc.Card([
+            dbc.CardBody([
+                html.Div([
+                    html.I(className=f"fas {s['icon']} fa-2x", style={'color': s['color'], 'marginRight': '15px'}),
+                    html.Div([
+                        html.H6(s['type'], style={'color': COLORS['text'], 'marginBottom': '5px'}),
+                        html.P(s['activity'], style={'color': COLORS['text_muted'], 'fontSize': '0.9rem', 'marginBottom': '0'}),
+                    ], style={'flex': 1})
+                ], style={'display': 'flex', 'alignItems': 'center'})
+            ])
+        ], style={'backgroundColor': COLORS['background'], 'marginBottom': '10px'}))
+
+    return items
+
+# === MOAT HEALTH CHART ===
+@app.callback(
+    Output('moat-health-chart', 'figure'),
+    [Input('moat-health-store', 'data')]
+)
+def update_moat_health_chart(moat_health):
+    pillars = list(moat_health.keys())
+    values = list(moat_health.values())
+    colors_list = [COLORS['primary'], COLORS['success'], COLORS['warning'], COLORS['info'], COLORS['corp']]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=pillars,
+        y=values,
+        marker=dict(color=colors_list),
+        text=[f"{v:.0f}%" for v in values],
+        textposition='outside'
+    ))
+
+    fig.update_layout(
+        title=dict(text="5-Pillar Moat Health (0-100%)", font=dict(color=COLORS['text'], size=16)),
+        plot_bgcolor=COLORS['card'],
+        paper_bgcolor=COLORS['card'],
+        font=dict(color=COLORS['text_muted']),
+        xaxis=dict(gridcolor=COLORS['border']),
+        yaxis=dict(title='Health %', gridcolor=COLORS['border'], range=[0, 100]),
+        margin=dict(l=40, r=20, t=60, b=80),
+        showlegend=False
+    )
+    return fig
+
+# === MOAT DETAILS ===
+@app.callback(
+    [Output('finance-moat-detail', 'children'),
+     Output('code-moat-detail', 'children'),
+     Output('logistics-moat-detail', 'children'),
+     Output('govt-moat-detail', 'children'),
+     Output('corp-moat-detail', 'children')],
+    [Input('moat-health-store', 'data')]
+)
+def update_moat_details(moat_health):
+    def create_detail(moat_name):
+        health = moat_health.get(moat_name, 100)
+        patterns = random.randint(50, 500)
+        agents = random.randint(15, 25)
+        return html.Div([
+            html.P(f"Health: {health:.0f}%", style={'color': COLORS['text'], 'fontSize': '1.2rem', 'fontWeight': '600'}),
+            html.P(f"Patterns: {patterns}", style={'color': COLORS['text_muted'], 'fontSize': '0.9rem'}),
+            html.P(f"Active Agents: {agents}", style={'color': COLORS['text_muted'], 'fontSize': '0.9rem'}),
+        ])
+
+    return (
+        create_detail('Finance'),
+        create_detail('Code Innovation'),
+        create_detail('Logistics'),
+        create_detail('Government'),
+        create_detail('US Corporations')
+    )
+
+# === AGENT CARD DISPLAY ===
+@app.callback(
+    Output('agent-card-display', 'children'),
+    [Input('agent-selector', 'value'),
+     Input('agent-stats-store', 'data')]
+)
+def update_agent_card_display(agent_id, agent_stats):
+    if not agent_id:
+        return html.P("Select an agent", style={'color': COLORS['text_muted']})
+
+    agent_info = AGENT_INFO.get(agent_id, {'name': 'Unknown', 'type': 'Unknown', 'color': COLORS['text_muted'], 'icon': 'fa-robot', 'product': 'N/A'})
+
+    # Get real agent stats or use defaults
+    agent_data = agent_stats.get(agent_id, {
+        'patterns_discovered': 0,
+        'policy_shares': 0,
+        'last_active': 'Never',
+        'generation': 0,
+        'parent': 'Genesis',
+        'children': [],
+        'status': 'Waiting for data...'
+    })
+
+    # Calculate interestingness score from real data
+    mock_agent_data = {
+        'id': agent_id,
+        'vector': [random.random() for _ in range(4)],
+        'score': min(agent_data['patterns_discovered'] / 100.0, 0.95),  # Based on patterns
+        'parent_id': agent_data.get('parent', 'Genesis'),
+        'generation': agent_data.get('generation', 0)
+    }
+    interestingness = calculate_interestingness(mock_agent_data, {})
+
+    # Count children (agents that have this agent as parent)
+    children_count = len([aid for aid, adata in agent_stats.items()
+                         if adata.get('parent') == agent_id])
+
+    # Build stats dictionary with REAL data
+    stats = {
+        'Interestingness Score': f"{interestingness:.1f}/100",
+        'Generation': agent_data.get('generation', 0),
+        'Patterns Discovered': agent_data.get('patterns_discovered', 0),
+        'Policy Shares': agent_data.get('policy_shares', 0),
+        'Parent': agent_data.get('parent', 'Genesis'),
+        'Children': children_count,
+        'Status': agent_data.get('status', 'Active'),
+        'Last Active': agent_data.get('last_active', 'Never')
+    }
+
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.I(className=f"fas {agent_info['icon']} fa-5x", style={'color': agent_info['color']}),
+                ], style={'textAlign': 'center', 'padding': '2rem'}),
+            ], width=3),
+            dbc.Col([
+                html.H3(agent_info['name'], style={'color': agent_info['color'], 'fontWeight': '700'}),
+                html.H5(f"ID: {agent_id}", style={'color': COLORS['text_muted']}),
+                html.P(f"Type: {agent_info['type']}", style={'color': COLORS['text'], 'fontSize': '1.1rem'}),
+                html.P(f"Product Moat: {agent_info['product']}", style={'color': COLORS['text'], 'fontSize': '1.1rem'}),
+            ], width=9),
+        ]),
+        html.Hr(style={'borderColor': COLORS['border']}),
+        dbc.Row([
+            dbc.Col([
+                html.H5("📊 Agent Statistics", style={'color': COLORS['primary'], 'marginBottom': '1rem'}),
+                html.Div([
+                    html.P([
+                        html.Strong(f"{k}: ", style={'color': COLORS['text_muted']}),
+                        html.Span(f"{v}", style={'color': COLORS['text']})
+                    ], style={'marginBottom': '0.5rem'})
+                    for k, v in stats.items()
+                ])
+            ], width=12),
+        ]),
+    ])
+
+# === SWARM HEALTH CHART ===
+@app.callback(
+    Output('swarm-health-chart', 'figure'),
+    [Input('swarm-health-store', 'data')]
+)
+def update_swarm_health_chart(swarm_health):
+    history = swarm_health.get('history', [100])
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        y=history,
+        mode='lines+markers',
+        line=dict(color=COLORS['success'], width=3),
+        marker=dict(size=6, color=COLORS['success']),
+        fill='tozeroy',
+        fillcolor=f'rgba(16, 185, 129, 0.2)',
+    ))
+
+    fig.update_layout(
+        title=dict(text="Swarm Health Over Time (0-100)", font=dict(color=COLORS['text'], size=16)),
+        plot_bgcolor=COLORS['card'],
+        paper_bgcolor=COLORS['card'],
+        font=dict(color=COLORS['text_muted']),
+        xaxis=dict(title='Time', gridcolor=COLORS['border']),
+        yaxis=dict(title='Health', gridcolor=COLORS['border'], range=[0, 100]),
+        margin=dict(l=40, r=20, t=60, b=40),
+    )
+    return fig
+
+# === INTERESTINGNESS DISTRIBUTION ===
+@app.callback(
+    Output('interestingness-dist', 'figure'),
+    [Input('interval', 'n_intervals')]
+)
+def update_interestingness_dist(n):
+    # Simulate distribution
+    scores = [random.uniform(40, 100) for _ in range(100)]
+
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(
+        x=scores,
+        nbinsx=20,
+        marker=dict(color=COLORS['primary']),
+    ))
+
+    fig.update_layout(
+        title=dict(text="Interestingness Score Distribution (All 100 Learners)", font=dict(color=COLORS['text'], size=16)),
+        plot_bgcolor=COLORS['card'],
+        paper_bgcolor=COLORS['card'],
+        font=dict(color=COLORS['text_muted']),
+        xaxis=dict(title='Interestingness Score', gridcolor=COLORS['border']),
+        yaxis=dict(title='Number of Agents', gridcolor=COLORS['border']),
+        margin=dict(l=40, r=20, t=60, b=40),
+    )
+    return fig
 
 if __name__ == '__main__':
     try:
-        listener_thread = threading.Thread(target=start_redis_listener, args=(message_queue,), daemon=True)
-        listener_thread.start()
-        logging.info("🚀 Starting User-Friendly Dashboard v5.0 on http://127.0.0.1:8053")
-        app.run(debug=False, port=8053, host='127.0.0.1')
+        app.run(debug=False, port=8055, host='127.0.0.1')
     except Exception as e:
         logging.critical(f"FATAL: {e}")

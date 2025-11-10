@@ -34,7 +34,17 @@
       "Bash(git push:*)",
       "Bash(timeout 8 cmd:*)",
       "Bash(timeout:*)",
-      "Bash(redis-cli:*)"
+      "Bash(redis-cli:*)",
+      "Bash(cmd /c \"taskkill /PID 26956 /F\")",
+      "Bash(wmic process where \"ProcessId=26956\" get Name,ExecutablePath,CommandLine)",
+      "Bash(powershell -Command \"Stop-Process -Id 26956 -Force\")",
+      "Bash(wmic process:*)",
+      "Bash(cmd /c \"taskkill /F /IM python.exe\")",
+      "Bash(powershell -Command \"Get-Process python | Stop-Process -Force\")",
+      "Bash(python test_system.py:*)",
+      "Bash(exit 0)",
+      "Bash(powershell:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

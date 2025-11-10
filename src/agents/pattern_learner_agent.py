@@ -12,10 +12,16 @@ class PatternLearnerAgent(MycelialAgent):
     This is the "brain" of the system. It now analyzes the rich feature set
     (RSI, ATR, Momentum) to make trading decisions, preparing for FRL.
     """
-    def __init__(self, model, pair_to_trade: str, rsi_threshold: int = 70, atr_multiplier: float = 1.0):
+    def __init__(self, model, pair_to_trade: str = "XXBTZUSD", product_focus: str = "Finance", rsi_threshold: int = 70, atr_multiplier: float = 1.0, parent_id: int | None = None, generation: int = 0):
         super().__init__(model)
         self.pair = pair_to_trade
-        self.name = f"SwarmBrain_{self.unique_id}"
+        self.product_focus = product_focus  # "Finance", "Code", or "Logistics"
+        self.name = f"SwarmBrain_{self.unique_id}_{product_focus}"
+
+        # --- NEW: Lineage Tracking for Evolution Moat (Big Rock 10) ---
+        self.parent_id = parent_id  # None for initial generation
+        self.generation = generation  # 0 for initial, increments with evolution
+        self.birth_timestamp = time.time()  # Track agent lifecycle
 
         # Strategy parameters (using features instead of SMAs)
         # We add randomization for strategy variance (Crucial for FRL)
@@ -23,8 +29,20 @@ class PatternLearnerAgent(MycelialAgent):
         self.atr_multiplier = atr_multiplier * random.uniform(0.8, 1.2)
         self.position = "FLAT"
 
-        # Channels
-        self.market_data_channel = f"market-data:{self.pair.replace('/', '-')}"
+        # Channels - Subscribe to appropriate data source based on product focus (5 PILLARS)
+        if product_focus == "Finance":
+            self.market_data_channel = f"market-data:{self.pair.replace('/', '-')}"
+        elif product_focus == "Code":
+            self.market_data_channel = "repo-data:Python"  # RepoScraper channel
+        elif product_focus == "Logistics":
+            self.market_data_channel = "logistics-data:US-West"  # LogisticsMiner channel
+        elif product_focus == "Government":
+            self.market_data_channel = "govt-data:US-Federal"  # GovtDataMiner channel
+        elif product_focus == "Corporations":
+            self.market_data_channel = "corp-data:Tech"  # CorpDataMiner channel
+        else:
+            self.market_data_channel = f"market-data:{self.pair.replace('/', '-')}"
+
         self.order_channel = "trade-orders"
         self.control_channel = "system-control"
 
@@ -82,10 +100,18 @@ class PatternLearnerAgent(MycelialAgent):
             log_data = {
                 'prediction_score': self.prediction_score,
                 'strategy_vector': strategy_vector,
-                'close_price': current_close
+                'close_price': current_close,
+                # --- NEW: Lineage Tracking (Big Rock 10) ---
+                'parent_id': self.parent_id,
+                'generation': self.generation,
+                'birth_timestamp': self.birth_timestamp,
+                'agent_id': self.unique_id,
+                # --- NEW: Product Moat Diversity (Big Rock 16) ---
+                'product_focus': self.product_focus
             }
             # The Vector DB writes the current prediction for peers and dashboard to read
-            self.vector_db.set(f"policy:{self.name}", json.dumps(log_data))
+            if self.vector_db:  # type: ignore
+                self.vector_db.set(f"policy:{self.name}", json.dumps(log_data))  # type: ignore
 
             # --- 4. Check for Missing Tools (Autonomous Request) ---
             # If the swarm hits a high-volatility zone but lacks data features, it requests a tool.
@@ -119,3 +145,40 @@ class PatternLearnerAgent(MycelialAgent):
             "amount": 0.001
         }
         self.publish(self.order_channel, order_message)
+
+    def simulate_peer_review(self):
+        """
+        Future FRL Evolution Hook: Agents review peer strategies and evolve.
+        This method will be triggered when agents want to learn from high-performing peers.
+        The offspring will inherit parent strategy parameters with small mutations.
+        """
+        try:
+            if not self.vector_db:  # type: ignore
+                return
+
+            # Fetch all peer policies from Vector DB
+            peer_keys = [k.decode('utf-8') if isinstance(k, bytes) else k
+                        for k in self.vector_db.keys("policy:SwarmBrain_*")]  # type: ignore
+
+            if len(peer_keys) < 5:
+                return  # Not enough peers to learn from yet
+
+            # Sample top-performing peers based on prediction scores
+            peer_scores = []
+            for key in peer_keys[:20]:  # Sample first 20 for performance
+                data = self.vector_db.get(key)  # type: ignore
+                if data:
+                    policy = json.loads(data)  # type: ignore
+                    peer_scores.append((key, policy.get('prediction_score', 0.5)))
+
+            # Sort by prediction score (descending)
+            peer_scores.sort(key=lambda x: x[1], reverse=True)
+
+            # Log the top performer for potential evolution
+            if peer_scores:
+                top_peer_key, top_score = peer_scores[0]
+                logging.info(f"[{self.name}] FRL: Top peer is {top_peer_key} with score {top_score:.3f}")
+                # Future: Trigger agent creation with this parent's strategies
+
+        except Exception as e:
+            logging.error(f"[{self.name}] Error in peer review: {e}")
