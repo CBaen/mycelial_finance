@@ -8,15 +8,16 @@ from src.agents.risk_management_agent import RiskManagementAgent
 from src.agents.pattern_learner_agent import PatternLearnerAgent
 from src.agents.repo_scrape_agent import RepoScrapeAgent  # NEW IMPORT
 from src.agents.builder_agent import BuilderAgent  # NEW IMPORT
+from src.agents.logistics_miner_agent import LogisticsMinerAgent  # NEW IMPORT
 import logging
 import random  # For randomized swarm strategies
 
 class MycelialModel(mesa.Model):
     """
     The main Mesa model that creates, holds, and steps all agents.
-    It now includes all three core product lines (Finance, Code, Autonomy).
+    It now includes all three core product lines (Finance, Code, Logistics, Autonomy).
     """
-    def __init__(self, pairs_to_trade: list, target_repos: list = ["Python"], num_traders: int = 1, num_risk_managers: int = 1, num_swarm_agents: int = 100):
+    def __init__(self, pairs_to_trade: list, target_repos: list = ["Python"], target_regions: list = ["US-West"], num_traders: int = 1, num_risk_managers: int = 1, num_swarm_agents: int = 100):
         super().__init__()
         self.running = True
         # Mesa 3.x uses built-in agent management (no scheduler needed)
@@ -26,7 +27,7 @@ class MycelialModel(mesa.Model):
         self.redis_client = RedisClient()
         self.kraken_client = KrakenClient()
 
-        if not self.redis_client.connection or not self.kraken_client.client:
+        if not self.redis_client.connection or not self.kraken_client.user:
             logging.critical("Failed to initialize clients. Model will not start.")
             self.running = False
             return
@@ -44,7 +45,12 @@ class MycelialModel(mesa.Model):
             scraper = RepoScrapeAgent(self, target_language=target)
             self.register_agent(scraper)
 
-        # 3. Create Pattern Learners (THE SWARM: 100 agents for BTC)
+        # 3. Create LOGISTICS MINERS (Senses for Product 3: Logistics Moat)
+        for region in target_regions:
+            logistics = LogisticsMinerAgent(self, target_region=region)
+            self.register_agent(logistics)
+
+        # 4. Create Pattern Learners (THE SWARM: 100 agents for BTC)
         btc_pair = 'XXBTZUSD'
         logging.info(f"Creating {num_swarm_agents}-agent Swarm for {btc_pair}...")
         for i in range(num_swarm_agents):
@@ -63,21 +69,21 @@ class MycelialModel(mesa.Model):
                 learner = PatternLearnerAgent(self, pair_to_trade=pair)
                 self.register_agent(learner)
 
-        # 4. Create Trading Agents (Hands)
+        # 5. Create Trading Agents (Hands)
         for i in range(num_traders):
             trader = TradingAgent(self)
             self.register_agent(trader)
 
-        # 5. Create Risk Managers (Guardians)
+        # 6. Create Risk Managers (Guardians)
         for i in range(num_risk_managers):
             risker = RiskManagementAgent(self, max_drawdown=0.05)
             self.register_agent(risker)
 
-        # 6. Create BUILDER AGENT (Autonomy)
+        # 7. Create BUILDER AGENT (Autonomy)
         builder = BuilderAgent(self)
         self.register_agent(builder)
 
-        logging.info(f"Mycelial Swarm created. Model initialized with {len(self.agents)} total agents, including the Autonomous Builder.")
+        logging.info(f"Mycelial Swarm created. Model initialized with {len(self.agents)} total agents, covering Finance, Code, and Logistics Moats.")
 
     def step(self):
         """
