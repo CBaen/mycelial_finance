@@ -618,11 +618,14 @@ def update_chart(data):
 @app.callback(Output('network-graph', 'figure'), Input('pulse-store', 'data'))
 def update_network(pulses):
     """
-    Creates a BEAUTIFUL 3D glowing star field visualization of ALL agents.
-    Each agent appears as a glowing celestial star in deep space.
+    Creates a BEAUTIFUL 3D orbital solar system visualization using physics-based orbits.
+    Adapted from production-quality code: https://thepythoncodingbook.com/2021/12/11/simulating-3d-solar-system-python-matplotlib/
     """
     import math
-    import numpy as np
+    import time
+
+    # Get current time for orbital animation
+    t = time.time() / 5  # Slow down orbital speed
 
     # Query Redis to get ALL active agents
     try:
@@ -645,76 +648,78 @@ def update_network(pulses):
     traders = [a for a in active_agents if 'TradingAgent' in a]
     risk_managers = [a for a in active_agents if 'RiskManagement' in a]
 
-    # Create beautiful 3D star positions using Fibonacci sphere for perfect distribution
-    def fibonacci_sphere(samples=100, radius=10):
-        """Distribute points evenly on a sphere surface - creates perfect star field"""
-        points = []
-        phi = math.pi * (3. - math.sqrt(5.))  # golden angle in radians
+    # Create orbital positions using circular orbit physics
+    def create_orbit(agent_index, total_agents, orbit_layer):
+        """
+        Create circular orbit position using parametric equations.
+        Based on Kepler's laws: x = r*cos(θ), y = r*sin(θ), z = slight tilt
+        """
+        # Orbital parameters
+        radius = 8 + (orbit_layer * 4)  # Orbital distance from sun
+        speed = 0.5 / radius  # Outer orbits move slower (Kepler's 3rd law)
+        phase = (agent_index / total_agents) * 2 * math.pi  # Distribute evenly around orbit
+        tilt = math.sin(agent_index * 0.5) * 2  # Slight z-axis variation for 3D effect
 
-        for i in range(samples):
-            y = 1 - (i / float(samples - 1)) * 2  # y goes from 1 to -1
-            radius_at_y = math.sqrt(1 - y * y)  # radius at y
+        # Calculate position at current time
+        angle = (t * speed) + phase
+        x = radius * math.cos(angle)
+        y = radius * math.sin(angle)
+        z = tilt * math.sin(angle * 0.3)  # Gentle z-oscillation
 
-            theta = phi * i  # golden angle increment
+        return [x, y, z]
 
-            x = math.cos(theta) * radius_at_y
-            z = math.sin(theta) * radius_at_y
-
-            points.append([x * radius, y * radius, z * radius])
-        return points
-
-    # Generate positions for all agents
-    all_agent_positions = fibonacci_sphere(samples=len(active_agents), radius=15)
-
-    # Create separate traces for each agent type (for beautiful coloring)
+    # Create separate traces for each agent type
     traces = []
 
-    # 1. Pattern Learners - Purple glowing swarm (THE STARS!)
+    # 1. Pattern Learners - Purple glowing swarm in multiple orbital rings
     if pattern_learners:
-        learner_positions = all_agent_positions[:len(pattern_learners)]
+        learner_positions = []
+        for i, agent in enumerate(pattern_learners):
+            orbit_layer = int(i / 20)  # 20 agents per orbital ring
+            pos = create_orbit(i, len(pattern_learners), orbit_layer + 1)
+            learner_positions.append(pos)
+
         x, y, z = zip(*learner_positions)
         traces.append(go.Scatter3d(
             x=x, y=y, z=z,
-            mode='markers+text',
+            mode='markers',
             name='Pattern Learners',
-            text=[f'Swarm {i+1}' if i < 5 else '' for i in range(len(pattern_learners))],
-            hovertext=[f'{agent}<br>Pattern Learner' for agent in pattern_learners],
+            hovertext=[f'{agent}<br>Pattern Learner<br>Orbital Swarm' for agent in pattern_learners],
             hoverinfo='text',
             marker=dict(
-                size=12,
+                size=8,
                 color='#a855f7',
-                opacity=0.8,
-                line=dict(color='#e9d5ff', width=2),  # Glowing outline
+                opacity=0.85,
+                line=dict(color='#e9d5ff', width=2),
                 symbol='circle'
-            ),
-            textfont=dict(color='#e9d5ff', size=8),
-            textposition='top center'
+            )
         ))
 
-    # 2. Trading Executor - Large golden sun at center
+    # 2. Trading Executor - GIANT golden sun at center (stationary)
     if traders:
         traces.append(go.Scatter3d(
-            x=[0], y=[0], z=[0],  # Center of constellation
+            x=[0], y=[0], z=[0],
             mode='markers+text',
             name='Trading Executor',
-            text=['☀ Executor'],
-            hovertext=[f'{traders[0]}<br>Trading Executor'],
+            text=[''],
+            hovertext=[f'{traders[0]}<br>Trading Executor<br>Central Sun'],
             hoverinfo='text',
             marker=dict(
-                size=35,
+                size=40,
                 color='#fbbf24',
-                opacity=0.9,
-                line=dict(color='#fef3c7', width=4),  # Brilliant glow
+                opacity=1.0,
+                line=dict(color='#fef3c7', width=6),
                 symbol='diamond'
-            ),
-            textfont=dict(color='#fef3c7', size=14, family='Arial Black'),
-            textposition='bottom center'
+            )
         ))
 
-    # 3. Data Miners - Bright blue sensor stars
+    # 3. Data Miners - Bright blue sensor stars in close orbit
     if data_miners:
-        sensor_idx = len(pattern_learners)
-        sensor_positions = all_agent_positions[sensor_idx:sensor_idx+len(data_miners)]
+        sensor_positions = []
+        for i, agent in enumerate(data_miners):
+            pos = create_orbit(i, len(data_miners), 0.5)  # Close orbit
+            sensor_positions.append(pos)
+
         x, y, z = zip(*sensor_positions)
         traces.append(go.Scatter3d(
             x=x, y=y, z=z,
@@ -724,58 +729,63 @@ def update_network(pulses):
             hovertext=[f'{agent}<br>Market Sensor' for agent in data_miners],
             hoverinfo='text',
             marker=dict(
-                size=20,
+                size=15,
                 color='#3b82f6',
-                opacity=0.85,
+                opacity=0.9,
                 line=dict(color='#93c5fd', width=3),
                 symbol='circle'
             ),
-            textfont=dict(color='#93c5fd', size=10, family='Arial'),
+            textfont=dict(color='#93c5fd', size=10),
             textposition='top center'
         ))
 
-    # 4. Risk Manager - Red guardian star
+    # 4. Risk Manager - Red guardian star in polar orbit
     if risk_managers:
-        risk_idx = len(pattern_learners) + len(data_miners)
-        risk_pos = all_agent_positions[risk_idx]
+        # Polar orbit (perpendicular to main orbital plane)
+        angle = t * 0.3
+        x_pos = 10 * math.sin(angle)
+        z_pos = 10 * math.cos(angle)
+
         traces.append(go.Scatter3d(
-            x=[risk_pos[0]], y=[risk_pos[1]], z=[risk_pos[2]],
+            x=[x_pos], y=[0], z=[z_pos],
             mode='markers+text',
             name='Risk Guardian',
-            text=['⚠ Guardian'],
-            hovertext=[f'{risk_managers[0]}<br>Risk Manager'],
+            text=['⚠'],
+            hovertext=[f'{risk_managers[0]}<br>Risk Manager<br>Polar Orbit Guardian'],
             hoverinfo='text',
             marker=dict(
-                size=25,
+                size=18,
                 color='#ef4444',
-                opacity=0.9,
-                line=dict(color='#fecaca', width=3),
+                opacity=0.95,
+                line=dict(color='#fecaca', width=4),
                 symbol='square'
             ),
-            textfont=dict(color='#fecaca', size=12, family='Arial'),
+            textfont=dict(color='#fecaca', size=14),
             textposition='top center'
         ))
 
-    # Create the figure with DEEP SPACE background
+    # Create the figure
     fig = go.Figure(data=traces)
 
-    # Make it look like BEAUTIFUL DEEP SPACE - NO AXES!
+    # BEAUTIFUL DEEP SPACE - NO AXES, SMOOTH ORBITS
     fig.update_layout(
         scene=dict(
             xaxis=dict(visible=False, showgrid=False, zeroline=False, showbackground=False),
             yaxis=dict(visible=False, showgrid=False, zeroline=False, showbackground=False),
             zaxis=dict(visible=False, showgrid=False, zeroline=False, showbackground=False),
-            bgcolor='#000000',  # Pure black space
+            bgcolor='#000000',
             camera=dict(
-                eye=dict(x=1.5, y=1.5, z=1.3),  # Nice viewing angle
+                eye=dict(x=1.5, y=1.5, z=1.2),
                 center=dict(x=0, y=0, z=0)
-            )
+            ),
+            aspectmode='cube'  # Ensures spherical orbits stay circular
         ),
         paper_bgcolor='#000000',
         plot_bgcolor='#000000',
         margin=dict(l=0, r=0, t=0, b=0),
         showlegend=False,
-        height=550
+        height=550,
+        uirevision='constant'  # Maintains zoom/pan state across updates
     )
 
     return fig

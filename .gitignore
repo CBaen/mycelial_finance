@@ -1,4 +1,27 @@
 # .gitignore
+
+# Python
 *.pyc
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Environment variables
 .env
+
+# Claude Code
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+nul
+*.tmp
+*.log
