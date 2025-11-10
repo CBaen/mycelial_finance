@@ -1,0 +1,19 @@
+# Core Agent Framework
+mesa>=1.0.0
+
+# "Mycelial" Communication Backbone
+redis>=5.0.0
+
+# Market Interface
+python-kraken-sdk>=2.0.0
+
+# Configuration & Security
+python-dotenv>=1.0.0
+
+# Dashboarding (for later)
+plotly>=5.0.0
+dash>=2.0.0
+
+# Data Analysis
+pandas>=2.0.0
+numpy>=1.20.0
