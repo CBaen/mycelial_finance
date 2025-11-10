@@ -16,7 +16,7 @@ def run_simulation():
     logging.info("--- Starting Mycelial Finance System ---")
 
     # Define our simulation parameters
-    pairs = ['XBT/USD', 'ETH/USD'] # Using Kraken's ticker pairs
+    pairs = ['XXBTZUSD', 'XETHZUSD'] # Using Kraken's official ticker names
 
     # Initialize the Model
     try:

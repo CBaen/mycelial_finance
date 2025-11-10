@@ -15,12 +15,11 @@ class RedisClient:
         try:
             self.connection = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=False)
             self.connection.ping()
-            self.pubsub = self.connection.pubsub(ignore_subscribe_messages=True)
+            # No longer creating a shared pubsub object - each subscriber gets its own
             logging.info(f"RedisClient connected to {REDIS_HOST}:{REDIS_PORT}")
         except Exception as e:
             logging.error(f"Failed to connect to Redis: {e}")
             self.connection = None
-            self.pubsub = None
 
     def publish_message(self, channel: str, message: dict):
         """
@@ -40,16 +39,20 @@ class RedisClient:
         """
         Subscribes to a channel and runs the callback function for each message.
         This must run in a non-blocking background thread.
+        Each subscription gets its own isolated pubsub object (private mailbox).
         """
-        if not self.pubsub:
-            logging.error("Redis PubSub not initialized. Cannot subscribe.")
+        if not self.connection:
+            logging.error("Redis connection not initialized. Cannot subscribe.")
             return
 
         def _listener_thread():
+            # Create a new, isolated pubsub object for this subscriber
+            pubsub = self.connection.pubsub(ignore_subscribe_messages=True)
+
             try:
-                self.pubsub.subscribe(channel)
+                pubsub.subscribe(channel)
                 logging.info(f"Subscribed to Redis channel: {channel}")
-                for message in self.pubsub.listen():
+                for message in pubsub.listen():
                     try:
                         # Deserialize the JSON message back into a Python dict
                         data = json.loads(message['data'])
@@ -61,6 +64,13 @@ class RedisClient:
                 logging.error(f"Redis connection lost in listener thread for {channel}. Stopping.")
             except Exception as e:
                 logging.error(f"Unhandled error in listener thread for {channel}: {e}")
+            finally:
+                # Clean up: close the pubsub connection to prevent memory leaks
+                try:
+                    pubsub.close()
+                    logging.debug(f"Closed pubsub connection for {channel}")
+                except Exception as e:
+                    logging.warning(f"Error closing pubsub for {channel}: {e}")
 
         # Start the listener in a daemon thread so it doesn't block
         thread = threading.Thread(target=_listener_thread, daemon=True)
