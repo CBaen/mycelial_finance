@@ -2,26 +2,24 @@
 import logging
 from .base_agent import MycelialAgent
 import pandas as pd
+import time
+import random
 
 class PatternLearnerAgent(MycelialAgent):
     """
-    This is the "brain" of the system (Part 3).
-    It listens to market data, applies a strategy, and
-    publishes trade orders.
-
-    This first version uses a simple SMA Crossover.
-    It MUST obey HALT commands from the RiskManagementAgent.
+    This is the "brain" of the system. It now analyzes the rich feature set
+    (RSI, ATR, Momentum) to make trading decisions, preparing for FRL.
     """
-    def __init__(self, model, pair_to_trade: str, short_window: int = 10, long_window: int = 30):
+    def __init__(self, model, pair_to_trade: str, rsi_threshold: int = 70, atr_multiplier: float = 1.0):
         super().__init__(model)
         self.pair = pair_to_trade
-        self.name = f"PatternLearner_{self.pair}_{self.unique_id}"
+        self.name = f"SwarmBrain_{self.unique_id}"
 
-        # Strategy parameters
-        self.short_window = short_window
-        self.long_window = long_window
-        self.prices = []
-        self.position = "FLAT" # "FLAT", "LONG"
+        # Strategy parameters (using features instead of SMAs)
+        # We add randomization for strategy variance (Crucial for FRL)
+        self.rsi_threshold = rsi_threshold + random.randint(-5, 5)
+        self.atr_multiplier = atr_multiplier * random.uniform(0.8, 1.2)
+        self.position = "FLAT"
 
         # Channels
         self.market_data_channel = f"market-data:{self.pair.replace('/', '-')}"
@@ -39,60 +37,60 @@ class PatternLearnerAgent(MycelialAgent):
         pass
 
     def handle_system_control(self, message: dict):
-        """Listens for HALT commands from the Risk Manager."""
         if message.get("command") == "HALT_TRADING":
             self.trading_halted = True
             logging.critical(f"[{self.name}] TRADING HALTED by Risk Manager. Reason: {message.get('reason')}")
 
     def handle_market_data(self, message: dict):
         """
-        Callback for new market data. This is the core logic.
+        Callback for new market data. Now uses the rich 'features' set.
         """
         if self.trading_halted:
-            logging.warning(f"[{self.name}] Trading is halted. Ignoring market data.")
-            return # Do not trade
+            return
 
         try:
-            # 'c' is 'last trade' price, in a nested list
-            last_price = float(message['data']['c'][0])
-            self.prices.append(last_price)
+            features = message.get('features')
+            if not features:
+                return # Ignore if features are still building up
 
-            # Need enough data to calculate SMAs
-            if len(self.prices) < self.long_window:
-                return
+            # 1. Extract Rich Features
+            current_rsi = features.get('RSI')
+            current_mom = features.get('MOM')
+            current_atr = features.get('ATR')
+            current_close = features.get('close')
 
-            # Keep price list from growing indefinitely
-            if len(self.prices) > self.long_window * 2:
-                self.prices.pop(0)
+            # 2. --- Feature-Based FRL Strategy (Initial Swarm Logic) ---
 
-            # Calculate SMAs
-            series = pd.Series(self.prices)
-            sma_short = series.rolling(window=self.short_window).mean().iloc[-1]
-            sma_long = series.rolling(window=self.long_window).mean().iloc[-1]
+            # Condition 1: RSI shows oversold (Buy pressure)
+            buy_condition = current_rsi < 30
+            # Condition 2: Momentum confirms upward trend
+            mom_condition = current_mom > 0
 
-            # --- Crossover Logic ---
-            # Golden Cross (Buy signal)
-            if sma_short > sma_long and self.position == "FLAT":
-                logging.info(f"[{self.name}] BUY Signal. SMA_Short ({sma_short}) > SMA_Long ({sma_long})")
+            # BUY Logic: Oversold AND positive momentum (ignoring ATR for simplicity in this MVP)
+            if buy_condition and mom_condition and self.position == "FLAT":
+                logging.info(f"[{self.name}] BUY Signal (RSI:{current_rsi:.1f}, MOM:{current_mom:.2f}).")
                 self.position = "LONG"
                 self.send_order(direction="buy")
 
-            # Death Cross (Sell signal)
-            elif sma_short < sma_long and self.position == "LONG":
-                logging.info(f"[{self.name}] SELL Signal. SMA_Short ({sma_short}) < SMA_Long ({sma_long})")
+            # SELL Logic: Overbought (RSI > randomized threshold) AND position is LONG
+            elif current_rsi > self.rsi_threshold and self.position == "LONG":
+                logging.info(f"[{self.name}] SELL Signal (RSI:{current_rsi:.1f}).")
                 self.position = "FLAT"
                 self.send_order(direction="sell")
+
+            # --- FRL LOGGING (Crucial for the Swarm) ---
+            # In a future step, this agent will publish its performance metrics
+            # and prediction scores here, using the rich feature data.
 
         except Exception as e:
             logging.error(f"[{self.name}] Error in strategy logic: {e}")
 
     def send_order(self, direction: str):
-        """Publishes a trade order to the 'hands' (TradingAgent)."""
         order_message = {
             "source": self.name,
             "pair": self.pair,
             "order_type": "market",
             "direction": direction,
-            "amount": 0.001 # TODO: Use a real position sizing algorithm
+            "amount": 0.001
         }
         self.publish(self.order_channel, order_message)

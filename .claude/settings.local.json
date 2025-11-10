@@ -17,7 +17,9 @@
       "Bash(wmic process where \"ProcessId=3664\" get Name,ExecutablePath,CommandLine)",
       "Bash(docker stop:*)",
       "Bash(docker run:*)",
-      "Bash(docker rm:*)"
+      "Bash(docker rm:*)",
+      "Bash(python dashboard.py:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
