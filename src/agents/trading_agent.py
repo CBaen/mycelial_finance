@@ -27,6 +27,7 @@ class TradingAgent(MycelialAgent):
 
     def handle_trade_order(self, message: dict):
         """
+        BIG ROCK 28: Filter orders by Interestingness Score (>75 threshold).
         This is the callback function triggered by a new message
         on the 'trade-orders' channel.
         """
@@ -37,6 +38,24 @@ class TradingAgent(MycelialAgent):
             if not all(key in message for key in required_keys):
                 logging.warning(f"[{self.name}] Invalid order received: {message}")
                 return
+
+            # BIG ROCK 28: HIGH-VALUE FILTER (Interestingness Score > 75)
+            interestingness_score = message.get('interestingness_score', 0)
+            if interestingness_score < 75:
+                source_agent = message.get('source', 'Unknown')
+                logging.warning(
+                    f"[{self.name}] Order REJECTED from {source_agent}: "
+                    f"Interestingness Score {interestingness_score:.1f} < 75 threshold"
+                )
+                return
+
+            # Log HIGH-VALUE execution
+            source_agent = message.get('source', 'Unknown')
+            prediction_score = message.get('prediction_score', 0)
+            logging.info(
+                f"[{self.name}] Order APPROVED from {source_agent}: "
+                f"Interestingness={interestingness_score:.1f}, Prediction={prediction_score:.2f}"
+            )
 
             # Extract order details
             pair = message['pair']
@@ -58,7 +77,8 @@ class TradingAgent(MycelialAgent):
             confirmation_message = {
                 "source": self.name,
                 "original_order": message,
-                "execution_result": result
+                "execution_result": result,
+                "interestingness_score": interestingness_score  # Include for tracking
             }
             self.publish(self.confirmation_channel, confirmation_message)
 

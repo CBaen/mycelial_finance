@@ -122,28 +122,53 @@ class PatternLearnerAgent(MycelialAgent):
                     "reason": f"High volatility (ATR: {current_atr:.1f}) detected, requiring external logistics data for causal correlation."
                 })
 
-            # --- 5. Trading Logic ---
-            buy_condition = current_rsi < 30
-            mom_condition = current_mom > 0
-
-            if buy_condition and mom_condition and self.position == "FLAT":
-                self.position = "LONG"
-                self.send_order(direction="buy")
-            elif current_rsi > self.rsi_threshold and self.position == "LONG":
+            # --- 5. Trading Logic (BIG ROCK 28: Prediction Score Threshold) ---
+            # DECISION FILTER: Only act when prediction confidence exceeds 80%
+            if self.prediction_score > 0.8 and self.position == "FLAT":
+                # High confidence BUY signal
+                if current_rsi < 30 and current_mom > 0:
+                    self.position = "LONG"
+                    self.send_order(direction="buy", current_close=current_close)
+            elif self.position == "LONG" and current_rsi > self.rsi_threshold:
+                # Exit LONG position
                 self.position = "FLAT"
-                self.send_order(direction="sell")
+                self.send_order(direction="sell", current_close=current_close)
 
         except Exception as e:
             logging.error(f"[{self.name}] Error in strategy logic: {e}")
 
-    def send_order(self, direction: str):
+    def send_order(self, direction: str, current_close: float = 0):
+        """
+        BIG ROCK 28: Send order with Interestingness Score for Trader filtering.
+        Calculates local interestingness based on agent's performance metrics.
+        """
+        # Calculate simplified Interestingness Score (0-100 scale)
+        # Components:
+        # 1. Performance (50%): Prediction score scaled to 0-50
+        # 2. Confidence (30%): How extreme the decision is (scaled to 0-30)
+        # 3. Activity (20%): Generation bonus (scaled to 0-20)
+
+        performance_score = self.prediction_score * 50  # 0-50 range
+        confidence_score = min(abs(self.prediction_score - 0.5) * 60, 30)  # How far from neutral (0-30)
+        activity_score = min(self.generation * 2 + 10, 20)  # Evolution bonus (0-20)
+
+        interestingness_score = performance_score + confidence_score + activity_score
+
         order_message = {
             "source": self.name,
             "pair": self.pair,
             "order_type": "market",
             "direction": direction,
-            "amount": 0.001
+            "amount": 0.001,
+            # BIG ROCK 28: Include scores for Trader filtering
+            "prediction_score": self.prediction_score,
+            "interestingness_score": interestingness_score,
+            "current_price": current_close,
+            "agent_generation": self.generation,
+            "product_focus": self.product_focus
         }
+
+        logging.info(f"[{self.name}] Sending {direction} order with Interestingness={interestingness_score:.1f}, Prediction={self.prediction_score:.2f}")
         self.publish(self.order_channel, order_message)
 
     def simulate_peer_review(self):

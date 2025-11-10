@@ -1,5 +1,5 @@
-# dashboard.py - MYCELIAL INTELLIGENCE v11.0: BIG ROCK 26 - Intelligent Storytelling Fix
-# Mission: Dynamic agent discovery, intelligent pattern analysis, rich storytelling
+# dashboard.py - MYCELIAL INTELLIGENCE v10.0: BIG ROCK 25 - Real Data & Pattern Discovery
+# Mission: ALL data is real, Pattern Discovery tab, Agent card carousel
 
 import dash
 from dash import dcc, html, Input, Output, State
@@ -15,9 +15,6 @@ import dash_bootstrap_components as dbc
 import uuid
 import numpy as np
 from datetime import datetime
-from collections import defaultdict
-from sklearn.cluster import KMeans
-from scipy import stats
 
 from src.connectors.redis_client import RedisClient
 
@@ -90,302 +87,29 @@ def calculate_interestingness(agent_data, all_agents):
 
     return min(score, 100)
 
-# === DYNAMIC AGENT METADATA SYSTEM ===
-def discover_agent_metadata(agent_id):
-    """
-    Dynamically assign metadata to any agent based on its ID pattern.
-    No more hardcoded AGENT_INFO!
-    """
-    # Default metadata
-    metadata = {
-        'name': agent_id,
-        'type': 'Unknown',
-        'color': COLORS['text_muted'],
-        'product': 'System',
-        'icon': 'fa-robot'
+# === AGENT METADATA ===
+AGENT_INFO = {
+    'DataMiner_XXBTZUSD_1': {'name': 'BTC Sensor', 'type': 'Data Miner', 'color': COLORS['primary'], 'product': 'Finance', 'icon': 'fa-bitcoin'},
+    'DataMiner_XETHZUSD_2': {'name': 'ETH Sensor', 'type': 'Data Miner', 'color': COLORS['primary'], 'product': 'Finance', 'icon': 'fa-ethereum'},
+    'RepoScraper_3': {'name': 'Code Hunter', 'type': 'Data Miner', 'color': COLORS['success'], 'product': 'Code Innovation', 'icon': 'fa-code'},
+    'LogisticsMiner_4': {'name': 'Flow Tracker', 'type': 'Data Miner', 'color': COLORS['warning'], 'product': 'Logistics', 'icon': 'fa-truck'},
+    'GovtDataMiner_5': {'name': 'Policy Scout', 'type': 'Data Miner', 'color': COLORS['info'], 'product': 'Government', 'icon': 'fa-landmark'},
+    'CorpDataMiner_6': {'name': 'Corp Intel', 'type': 'Data Miner', 'color': COLORS['corp'], 'product': 'US Corporations', 'icon': 'fa-building'},
+    'Trader_107': {'name': 'Trade Executor', 'type': 'Action Agent', 'color': '#fbbf24', 'product': 'System', 'icon': 'fa-bolt'},
+    'RiskManager_108': {'name': 'Safety Monitor', 'type': 'HAVEN Guardian', 'color': COLORS['danger'], 'product': 'System', 'icon': 'fa-shield-alt'},
+    'AutonomousBuilder_109': {'name': 'Builder', 'type': 'Evolution Engine', 'color': '#9333ea', 'product': 'System', 'icon': 'fa-cogs'},
+}
+
+for i in range(7, 107):
+    products = ['Finance', 'Code Innovation', 'Logistics', 'Government', 'US Corporations']
+    product = products[i % 5]
+    AGENT_INFO[f'SwarmBrain_{i}'] = {
+        'name': f'Brain {i}',
+        'type': 'Pattern Learner',
+        'color': COLORS['primary'],
+        'product': product,
+        'icon': 'fa-brain'
     }
-
-    # Pattern matching for agent types
-    if 'DataEngineer' in agent_id or 'DataMiner' in agent_id:
-        metadata['type'] = 'Data Engineer'
-        metadata['color'] = COLORS['primary']
-        metadata['icon'] = 'fa-database'
-        if 'BTC' in agent_id or 'XXBTZUSD' in agent_id:
-            metadata['name'] = 'BTC Sensor'
-            metadata['product'] = 'Finance'
-            metadata['icon'] = 'fa-bitcoin'
-        elif 'ETH' in agent_id or 'XETHZUSD' in agent_id:
-            metadata['name'] = 'ETH Sensor'
-            metadata['product'] = 'Finance'
-            metadata['icon'] = 'fa-ethereum'
-        else:
-            metadata['name'] = f"Data Engineer {agent_id.split('_')[-1]}"
-            metadata['product'] = 'Finance'
-
-    elif 'RepoScraper' in agent_id:
-        metadata['name'] = f"Code Hunter {agent_id.split('_')[-1]}"
-        metadata['type'] = 'Code Scraper'
-        metadata['color'] = COLORS['success']
-        metadata['product'] = 'Code Innovation'
-        metadata['icon'] = 'fa-code'
-
-    elif 'LogisticsMiner' in agent_id:
-        metadata['name'] = f"Flow Tracker {agent_id.split('_')[-1]}"
-        metadata['type'] = 'Logistics Miner'
-        metadata['color'] = COLORS['warning']
-        metadata['product'] = 'Logistics'
-        metadata['icon'] = 'fa-truck'
-
-    elif 'GovtDataMiner' in agent_id:
-        metadata['name'] = f"Policy Scout {agent_id.split('_')[-1]}"
-        metadata['type'] = 'Government Analyst'
-        metadata['color'] = COLORS['info']
-        metadata['product'] = 'Government'
-        metadata['icon'] = 'fa-landmark'
-
-    elif 'CorpDataMiner' in agent_id:
-        metadata['name'] = f"Corp Intel {agent_id.split('_')[-1]}"
-        metadata['type'] = 'Corporate Analyst'
-        metadata['color'] = COLORS['corp']
-        metadata['product'] = 'US Corporations'
-        metadata['icon'] = 'fa-building'
-
-    elif 'SwarmBrain' in agent_id:
-        # Extract product focus from agent name (e.g., SwarmBrain_7_Finance)
-        parts = agent_id.split('_')
-        product = 'Finance'  # default
-        if len(parts) >= 3:
-            product = parts[2]
-
-        metadata['name'] = f"Brain {parts[1] if len(parts) > 1 else '?'}"
-        metadata['type'] = 'Pattern Learner'
-        metadata['icon'] = 'fa-brain'
-
-        # Color by product
-        if 'Finance' in product:
-            metadata['color'] = COLORS['primary']
-            metadata['product'] = 'Finance'
-        elif 'Code' in product:
-            metadata['color'] = COLORS['success']
-            metadata['product'] = 'Code Innovation'
-        elif 'Logistics' in product:
-            metadata['color'] = COLORS['warning']
-            metadata['product'] = 'Logistics'
-        elif 'Government' in product:
-            metadata['color'] = COLORS['info']
-            metadata['product'] = 'Government'
-        elif 'Corporation' in product:
-            metadata['color'] = COLORS['corp']
-            metadata['product'] = 'US Corporations'
-        else:
-            metadata['color'] = COLORS['primary']
-            metadata['product'] = 'Finance'
-
-    elif 'Trader' in agent_id:
-        metadata['name'] = 'Trade Executor'
-        metadata['type'] = 'Action Agent'
-        metadata['color'] = '#fbbf24'
-        metadata['product'] = 'System'
-        metadata['icon'] = 'fa-bolt'
-
-    elif 'RiskManager' in agent_id:
-        metadata['name'] = 'Safety Monitor'
-        metadata['type'] = 'HAVEN Guardian'
-        metadata['color'] = COLORS['danger']
-        metadata['product'] = 'System'
-        metadata['icon'] = 'fa-shield-alt'
-
-    elif 'Builder' in agent_id or 'AutonomousBuilder' in agent_id:
-        metadata['name'] = 'Builder'
-        metadata['type'] = 'Evolution Engine'
-        metadata['color'] = '#9333ea'
-        metadata['product'] = 'System'
-        metadata['icon'] = 'fa-cogs'
-
-    return metadata
-
-# === INTELLIGENT PATTERN DISCOVERY ENGINE ===
-class PatternDiscoveryEngine:
-    """
-    Intelligent pattern analysis with clustering, anomaly detection, and correlation.
-    This is the brain that finds REAL patterns, not just data observations.
-    """
-    def __init__(self):
-        self.historical_data = defaultdict(list)  # Store data by moat
-        self.pattern_relationships = []  # Track pattern evolution
-        self.agent_collaborations = defaultdict(set)  # Track which agents work together
-
-    def add_data_point(self, moat, features, agent_id, timestamp):
-        """Store data for intelligent analysis."""
-        self.historical_data[moat].append({
-            'features': features,
-            'agent': agent_id,
-            'time': timestamp
-        })
-
-        # Limit history
-        if len(self.historical_data[moat]) > 100:
-            self.historical_data[moat] = self.historical_data[moat][-100:]
-
-    def detect_anomaly(self, moat, current_features):
-        """
-        Detect statistical anomalies using Z-score.
-        Returns (is_anomaly, confidence, description)
-        """
-        if len(self.historical_data[moat]) < 10:
-            return False, 0.0, ""
-
-        try:
-            # Extract key metrics from historical data
-            values = []
-            for item in self.historical_data[moat]:
-                # Get first numeric feature value
-                feat = item['features']
-                for v in feat.values():
-                    if isinstance(v, (int, float)):
-                        values.append(v)
-                        break
-
-            if len(values) < 10:
-                return False, 0.0, ""
-
-            # Calculate Z-score for current value
-            current_val = next((v for v in current_features.values() if isinstance(v, (int, float))), None)
-            if current_val is None:
-                return False, 0.0, ""
-
-            mean = np.mean(values)
-            std = np.std(values)
-            if std == 0:
-                return False, 0.0, ""
-
-            z_score = abs((current_val - mean) / std)
-
-            if z_score > 2.5:  # 2.5 sigma threshold
-                confidence = min(z_score / 5.0, 1.0)  # Normalize to 0-1
-                description = f"Anomaly: Value {current_val:.2f} deviates {z_score:.1f}σ from mean {mean:.2f}"
-                return True, confidence, description
-
-        except Exception as e:
-            logging.debug(f"Anomaly detection error: {e}")
-
-        return False, 0.0, ""
-
-    def find_cross_moat_correlation(self, moat1, moat2, threshold=0.7):
-        """
-        Find correlations between two moats.
-        Returns (is_correlated, correlation, description)
-        """
-        if len(self.historical_data[moat1]) < 20 or len(self.historical_data[moat2]) < 20:
-            return False, 0.0, ""
-
-        try:
-            # Extract time-series values
-            values1 = []
-            values2 = []
-
-            # Get last 20 data points
-            data1 = self.historical_data[moat1][-20:]
-            data2 = self.historical_data[moat2][-20:]
-
-            for item in data1:
-                for v in item['features'].values():
-                    if isinstance(v, (int, float)):
-                        values1.append(v)
-                        break
-
-            for item in data2:
-                for v in item['features'].values():
-                    if isinstance(v, (int, float)):
-                        values2.append(v)
-                        break
-
-            if len(values1) < 10 or len(values2) < 10:
-                return False, 0.0, ""
-
-            # Align lengths
-            min_len = min(len(values1), len(values2))
-            values1 = values1[:min_len]
-            values2 = values2[:min_len]
-
-            # Calculate Pearson correlation
-            correlation = np.corrcoef(values1, values2)[0, 1]
-
-            if abs(correlation) > threshold:
-                direction = "positive" if correlation > 0 else "negative"
-                description = f"Strong {direction} correlation ({correlation:.2f}) between {moat1} and {moat2}"
-                return True, abs(correlation), description
-
-        except Exception as e:
-            logging.debug(f"Correlation analysis error: {e}")
-
-        return False, 0.0, ""
-
-    def cluster_similar_patterns(self, moat, n_clusters=3):
-        """
-        Cluster similar patterns using K-means.
-        Returns (cluster_id, cluster_description)
-        """
-        if len(self.historical_data[moat]) < 10:
-            return None, ""
-
-        try:
-            # Extract feature vectors
-            vectors = []
-            for item in self.historical_data[moat]:
-                vec = [v for v in item['features'].values() if isinstance(v, (int, float))]
-                if vec:
-                    vectors.append(vec[:4])  # Take first 4 features
-
-            if len(vectors) < 5:
-                return None, ""
-
-            # Pad vectors to same length
-            max_len = max(len(v) for v in vectors)
-            vectors = [v + [0] * (max_len - len(v)) for v in vectors]
-
-            # K-means clustering
-            vectors_array = np.array(vectors)
-            kmeans = KMeans(n_clusters=min(n_clusters, len(vectors)), random_state=42, n_init=10)
-            kmeans.fit(vectors_array)
-
-            # Get cluster for latest data point
-            latest_cluster = kmeans.labels_[-1]
-            cluster_size = np.sum(kmeans.labels_ == latest_cluster)
-
-            description = f"Pattern belongs to cluster {latest_cluster} ({cluster_size} similar patterns)"
-            return int(latest_cluster), description
-
-        except Exception as e:
-            logging.debug(f"Clustering error: {e}")
-
-        return None, ""
-
-    def track_agent_collaboration(self, agents_list, pattern_id):
-        """Track which agents work together on patterns."""
-        if len(agents_list) >= 2:
-            # Record all pairwise collaborations
-            for i, agent1 in enumerate(agents_list):
-                for agent2 in agents_list[i+1:]:
-                    pair = tuple(sorted([agent1, agent2]))
-                    self.agent_collaborations[pair].add(pattern_id)
-
-    def get_collaboration_strength(self, agent1, agent2):
-        """Get collaboration strength between two agents."""
-        pair = tuple(sorted([agent1, agent2]))
-        return len(self.agent_collaborations.get(pair, set()))
-
-    def track_pattern_evolution(self, parent_pattern_id, child_pattern_id, relationship_type):
-        """Track how patterns evolve from each other."""
-        self.pattern_relationships.append({
-            'parent': parent_pattern_id,
-            'child': child_pattern_id,
-            'type': relationship_type,
-            'time': datetime.now().strftime('%H:%M:%S')
-        })
-
-# Initialize pattern discovery engine
-pattern_engine = PatternDiscoveryEngine()
 
 # === DASH APP ===
 app = dash.Dash(
@@ -397,7 +121,7 @@ app = dash.Dash(
     ],
     suppress_callback_exceptions=True,
 )
-app.title = "Mycelial Intelligence - v11.0 Intelligent Storytelling"
+app.title = "Mycelial Intelligence - v10.0 Real Data Engine"
 
 # === LAYOUT ===
 app.layout = dbc.Container(
@@ -412,18 +136,16 @@ app.layout = dbc.Container(
         dcc.Store(id='agent-stats-store', data={}),
         dcc.Store(id='discoveries-store', data=[]),
         dcc.Store(id='swarm-health-store', data={'value': 100, 'history': [100]}),
-        dcc.Store(id='pattern-details-store', data=[]),  # Enhanced with intelligence
-        dcc.Store(id='moat-stats-store', data={
-            'Finance': {'patterns': 0, 'agents': []},
-            'Code Innovation': {'patterns': 0, 'agents': []},
-            'Logistics': {'patterns': 0, 'agents': []},
-            'Government': {'patterns': 0, 'agents': []},
-            'US Corporations': {'patterns': 0, 'agents': []}
+        dcc.Store(id='pattern-details-store', data=[]),  # NEW: Track individual patterns
+        dcc.Store(id='moat-stats-store', data={  # NEW: Track real moat stats
+            'Finance': {'patterns': 0, 'agents': set()},
+            'Code Innovation': {'patterns': 0, 'agents': set()},
+            'Logistics': {'patterns': 0, 'agents': set()},
+            'Government': {'patterns': 0, 'agents': set()},
+            'US Corporations': {'patterns': 0, 'agents': set()}
         }),
-        dcc.Store(id='haven-risk-store', data={'current_risk': 15, 'history': [15]}),
-        dcc.Store(id='agent-carousel-index', data=0),
-        dcc.Store(id='collaboration-store', data={}),  # NEW: Agent collaboration tracking
-        dcc.Store(id='pattern-evolution-store', data=[]),  # NEW: Pattern lineage
+        dcc.Store(id='haven-risk-store', data={'current_risk': 15, 'history': [15]}),  # NEW: Track real HAVEN risk
+        dcc.Store(id='agent-carousel-index', data=0),  # NEW: Track carousel position
 
         dcc.Interval(id='interval', interval=2000, n_intervals=0),
 
@@ -433,7 +155,7 @@ app.layout = dbc.Container(
                 html.I(className="fas fa-brain", style={'marginRight': '15px', 'color': COLORS['primary']}),
                 "MYCELIAL INTELLIGENCE ENGINE"
             ], style={'fontSize': '2.5rem', 'fontWeight': '700', 'color': COLORS['text'], 'textAlign': 'center'}),
-            html.P("v11.0: Big Rock 26 - Intelligent Storytelling & Pattern Discovery",
+            html.P("v10.0: Big Rock 25 - Real Data & Pattern Discovery",
                   style={'color': COLORS['text_muted'], 'fontSize': '0.95rem', 'textAlign': 'center'}),
         ], className="py-3 mb-4"))),
 
@@ -445,11 +167,12 @@ app.layout = dbc.Container(
                         html.Div([
                             html.I(className="fas fa-lightbulb fa-2x", style={'color': COLORS['warning']}),
                             dbc.Tooltip(
-                                "Total intelligent patterns discovered through clustering, anomaly detection, and correlation analysis.",
+                                "Total unique patterns discovered by your 100-agent swarm across all 5 product moats. "
+                                "This is your cumulative intelligence growth metric.",
                                 target="patterns-discovered-card",
                             ),
                         ], style={'float': 'right'}),
-                        html.H6("Intelligent Patterns", style={'color': COLORS['text_muted'], 'marginBottom': '10px'}),
+                        html.H6("Patterns Discovered", style={'color': COLORS['text_muted'], 'marginBottom': '10px'}),
                         html.H2(id='total-patterns-metric', children="0", style={'color': COLORS['warning'], 'fontWeight': '700'}),
                         html.P(id='patterns-growth-text', children="+0 this session", style={'color': COLORS['success'], 'fontSize': '0.9rem'}),
                     ])
@@ -524,14 +247,14 @@ app.layout = dbc.Container(
         ]),
         html.Div(id="tab-content"),
 
-        html.Div(f"Session {SESSION_ID} | Big Rock 26: Intelligent Storytelling | Dynamic Agent Discovery",
+        html.Div(f"Session {SESSION_ID} | Big Rock 25: Real Data Engine | All Data is Live",
                 className="text-center mt-4", style={'color': COLORS['text_muted'], 'fontSize': '0.75rem'})
     ]
 )
 
 # === REDIS LISTENER ===
 def start_redis_listener(app_queue: Queue):
-    logging.info("v11.0 Intelligent Engine: Redis listener started")
+    logging.info("v10.0 Real Data Engine: Redis listener started")
     try:
         redis_client = RedisClient()
     except Exception as e:
@@ -551,8 +274,7 @@ def start_redis_listener(app_queue: Queue):
         'repo-data:*': 'repo-data',
         'logistics-data:*': 'logistics-data',
         'agent-lineage-update': 'lineage-update',
-        'govt-data:*': 'govt-data',
-        'pattern-discovery:*': 'intelligent-pattern'  # NEW: For intelligent pattern messages
+        'govt-data:*': 'govt-data'
     }
 
     def create_listener(pattern, msg_type):
@@ -579,9 +301,9 @@ def start_redis_listener(app_queue: Queue):
 
 listener_thread = threading.Thread(target=start_redis_listener, args=(message_queue,), daemon=True)
 listener_thread.start()
-logging.info("Mycelial Intelligent Engine v11.0 Active")
+logging.info("Mycelial Real Data Engine v10.0 Active")
 
-# === MAIN DATA UPDATE WITH INTELLIGENT PATTERN DISCOVERY ===
+# === MAIN DATA UPDATE ===
 @app.callback(
     [Output('pattern-store', 'data'),
      Output('moat-health-store', 'data'),
@@ -591,9 +313,7 @@ logging.info("Mycelial Intelligent Engine v11.0 Active")
      Output('discoveries-store', 'data'),
      Output('pattern-details-store', 'data'),
      Output('moat-stats-store', 'data'),
-     Output('haven-risk-store', 'data'),
-     Output('collaboration-store', 'data'),
-     Output('pattern-evolution-store', 'data')],
+     Output('haven-risk-store', 'data')],
     [Input('interval', 'n_intervals')],
     [State('pattern-store', 'data'),
      State('moat-health-store', 'data'),
@@ -603,13 +323,10 @@ logging.info("Mycelial Intelligent Engine v11.0 Active")
      State('discoveries-store', 'data'),
      State('pattern-details-store', 'data'),
      State('moat-stats-store', 'data'),
-     State('haven-risk-store', 'data'),
-     State('collaboration-store', 'data'),
-     State('pattern-evolution-store', 'data')]
+     State('haven-risk-store', 'data')]
 )
-def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_health, discoveries,
-                pattern_details, moat_stats, haven_risk, collaboration_data, pattern_evolution):
-    """Process Redis messages with INTELLIGENT pattern discovery."""
+def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_health, discoveries, pattern_details, moat_stats, haven_risk):
+    """Process Redis messages and update all stores with REAL data only."""
 
     # Process all queued messages
     while not message_queue.empty():
@@ -632,108 +349,35 @@ def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_h
                     'children': [],
                     'status': 'Active',
                     'vector': [0.0, 0.0, 0.0, 0.0],
-                    'id': source,
-                    'collaborators': []  # NEW: Track collaboration partners
+                    'id': source
                 }
             agent_stats[source]['last_active'] = timestamp
 
-        # === INTELLIGENT PATTERN PROCESSING ===
-        if msg_type in ['market-data', 'repo-data', 'logistics-data', 'govt-data', 'policy-data', 'corporate-data']:
-            # Determine moat
-            moat_map = {
-                'market-data': 'Finance',
-                'repo-data': 'Code Innovation',
-                'logistics-data': 'Logistics',
-                'govt-data': 'Government',
-                'policy-data': 'Government',
-                'corporate-data': 'US Corporations'
-            }
-            moat = moat_map.get(msg_type, 'Finance')
+        # Track patterns by type with full metadata
+        if msg_type == 'market-data':
+            pair = data.get('pair', 'Unknown')
+            moat = 'Finance'
 
+            # Extract pattern signature from data
             features = data.get('features', {})
-            if not features:
-                continue
+            pattern_signature = f"{pair} | Close: {features.get('close', 'N/A'):.2f} | RSI: {features.get('RSI', 'N/A'):.1f}"
 
-            # Add data to intelligent engine
-            pattern_engine.add_data_point(moat, features, source, timestamp)
-
-            # === INTELLIGENT ANALYSIS ===
-            pattern_types = []
-            confidence_scores = []
-            descriptions = []
-
-            # 1. Anomaly Detection
-            is_anomaly, anomaly_conf, anomaly_desc = pattern_engine.detect_anomaly(moat, features)
-            if is_anomaly:
-                pattern_types.append('anomaly')
-                confidence_scores.append(anomaly_conf)
-                descriptions.append(anomaly_desc)
-
-            # 2. Clustering
-            cluster_id, cluster_desc = pattern_engine.cluster_similar_patterns(moat)
-            if cluster_id is not None:
-                pattern_types.append('cluster')
-                confidence_scores.append(0.7)  # Moderate confidence
-                descriptions.append(cluster_desc)
-
-            # 3. Cross-Moat Correlation (check with one other moat)
-            other_moats = [m for m in moat_map.values() if m != moat]
-            if other_moats:
-                for other_moat in other_moats[:2]:  # Check max 2 for performance
-                    is_corr, corr_val, corr_desc = pattern_engine.find_cross_moat_correlation(moat, other_moat)
-                    if is_corr:
-                        pattern_types.append('correlation')
-                        confidence_scores.append(corr_val)
-                        descriptions.append(corr_desc)
-                        break
-
-            # Create base pattern signature
-            feature_str = " | ".join([f"{k}: {v:.2f}" if isinstance(v, float) else f"{k}: {v}"
-                                     for k, v in list(features.items())[:3]])
-
-            # Determine pattern type and semantic description
-            if pattern_types:
-                primary_type = pattern_types[0]
-                semantic_desc = descriptions[0]
-                effectiveness = confidence_scores[0] * 100
-            else:
-                primary_type = 'observation'
-                semantic_desc = f"Data observation in {moat}"
-                effectiveness = 50.0
-
-            # Enhanced pattern record
-            pattern_id = f"P{pattern_data['total_patterns'] + 1}"
+            # Record detailed pattern
             pattern_record = {
-                'id': pattern_id,
                 'time': timestamp,
                 'moat': moat,
-                'pattern': feature_str,
+                'pattern': pattern_signature,
                 'agents': [source],
-                'type': primary_type,
-                'semantic_description': semantic_desc,
-                'effectiveness_score': effectiveness,
-                'moat_connections': [moat],  # Can be expanded for correlations
-                'parent_patterns': [],  # Will be filled if evolution detected
-                'confidence': confidence_scores[0] if confidence_scores else 0.5
+                'type': 'Market Analysis'
             }
             pattern_details.append(pattern_record)
-
-            # Activity log with rich context
-            type_icons = {
-                'anomaly': '⚡',
-                'cluster': '🎯',
-                'correlation': '🔗',
-                'observation': '📊'
-            }
-            icon = type_icons.get(primary_type, '📊')
 
             activity_log.append({
                 'time': timestamp,
                 'agent': source,
-                'action': f'{icon} {primary_type.title()}: {semantic_desc[:50]}...',
-                'color': COLORS.get(moat.lower(), COLORS['primary'])
+                'action': f'📊 {pair} Pattern Detected',
+                'color': COLORS['primary']
             })
-
             pattern_data['total_patterns'] += 1
             moat_health[moat] = min(100, moat_health.get(moat, 100) + 0.5)
 
@@ -748,38 +392,137 @@ def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_h
                 agent_stats[source]['patterns_discovered'] += 1
                 agent_stats[source]['policy_shares'] += 1
 
-        elif msg_type == 'intelligent-pattern':
-            # Handle intelligent patterns published by PatternLearner agents
-            pattern_type = data.get('pattern_type', 'discovery')
-            description = data.get('description', 'Pattern discovered')
-            confidence = data.get('confidence', 0.5)
-            related_agents = data.get('related_agents', [source])
+        elif msg_type == 'repo-data':
+            moat = 'Code Innovation'
+            features = data.get('features', {})
+            pattern_signature = f"Code: Stars {features.get('StarVelocity', 0):.0f} | Forks {features.get('ForkVelocity', 0):.0f}"
 
-            # Track collaboration
-            if len(related_agents) > 1:
-                pattern_engine.track_agent_collaboration(related_agents, f"IP{pattern_data['total_patterns']}")
-                for agent in related_agents:
-                    if agent in agent_stats:
-                        collab_list = agent_stats[agent].get('collaborators', [])
-                        for other in related_agents:
-                            if other != agent and other not in collab_list:
-                                collab_list.append(other)
-                        agent_stats[agent]['collaborators'] = collab_list[:10]  # Keep top 10
-
-            pattern_details.append({
-                'id': f"IP{pattern_data['total_patterns']}",
+            pattern_record = {
                 'time': timestamp,
-                'moat': 'Cross-Moat',
-                'pattern': description,
-                'agents': related_agents,
-                'type': pattern_type,
-                'semantic_description': description,
-                'effectiveness_score': confidence * 100,
-                'moat_connections': ['Multiple'],
-                'parent_patterns': [],
-                'confidence': confidence
+                'moat': moat,
+                'pattern': pattern_signature,
+                'agents': [source],
+                'type': 'Code Discovery'
+            }
+            pattern_details.append(pattern_record)
+
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'💡 Code Innovation Pattern',
+                'color': COLORS['success']
             })
             pattern_data['total_patterns'] += 1
+            moat_health[moat] = min(100, moat_health.get(moat, 100) + 0.5)
+
+            if isinstance(moat_stats[moat]['agents'], set):
+                moat_stats[moat]['agents'].add(source)
+            else:
+                moat_stats[moat]['agents'] = {source}
+            moat_stats[moat]['patterns'] = moat_stats[moat].get('patterns', 0) + 1
+
+            if source and source != 'Unknown':
+                agent_stats[source]['patterns_discovered'] += 1
+                agent_stats[source]['policy_shares'] += 1
+
+        elif msg_type == 'logistics-data':
+            moat = 'Logistics'
+            features = data.get('features', {})
+            pattern_signature = f"Logistics: Efficiency {features.get('RouteEfficiency', 0):.1f} | Velocity {features.get('CargoVelocity', 0):.1f}"
+
+            pattern_record = {
+                'time': timestamp,
+                'moat': moat,
+                'pattern': pattern_signature,
+                'agents': [source],
+                'type': 'Logistics Flow'
+            }
+            pattern_details.append(pattern_record)
+
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'🚚 Logistics Flow Pattern',
+                'color': COLORS['warning']
+            })
+            pattern_data['total_patterns'] += 1
+            moat_health[moat] = min(100, moat_health.get(moat, 100) + 0.5)
+
+            if isinstance(moat_stats[moat]['agents'], set):
+                moat_stats[moat]['agents'].add(source)
+            else:
+                moat_stats[moat]['agents'] = {source}
+            moat_stats[moat]['patterns'] = moat_stats[moat].get('patterns', 0) + 1
+
+            if source and source != 'Unknown':
+                agent_stats[source]['patterns_discovered'] += 1
+                agent_stats[source]['policy_shares'] += 1
+
+        elif msg_type == 'govt-data' or msg_type == 'policy-data':
+            moat = 'Government'
+            features = data.get('features', {})
+            pattern_signature = f"Policy: Intensity {features.get('RegulatoryIntensity', 0):.1f} | Stability {features.get('PolicyStability', 0):.1f}"
+
+            pattern_record = {
+                'time': timestamp,
+                'moat': moat,
+                'pattern': pattern_signature,
+                'agents': [source],
+                'type': 'Policy Shift'
+            }
+            pattern_details.append(pattern_record)
+
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'🏛️ Policy Pattern Detected',
+                'color': COLORS['info']
+            })
+            pattern_data['total_patterns'] += 1
+            moat_health[moat] = min(100, moat_health.get(moat, 100) + 0.5)
+
+            if isinstance(moat_stats[moat]['agents'], set):
+                moat_stats[moat]['agents'].add(source)
+            else:
+                moat_stats[moat]['agents'] = {source}
+            moat_stats[moat]['patterns'] = moat_stats[moat].get('patterns', 0) + 1
+
+            if source and source != 'Unknown':
+                agent_stats[source]['patterns_discovered'] += 1
+                agent_stats[source]['policy_shares'] += 1
+
+        elif msg_type == 'corporate-data':
+            moat = 'US Corporations'
+            features = data.get('features', {})
+            pattern_signature = f"Corp: Earnings {features.get('EarningsMomentum', 0):.1f} | M&A {features.get('MandA_Activity', 0):.1f}"
+
+            pattern_record = {
+                'time': timestamp,
+                'moat': moat,
+                'pattern': pattern_signature,
+                'agents': [source],
+                'type': 'Corporate Intel'
+            }
+            pattern_details.append(pattern_record)
+
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'🏢 Corporate Intel Pattern',
+                'color': COLORS['corp']
+            })
+            pattern_data['total_patterns'] += 1
+            moat_health[moat] = min(100, moat_health.get(moat, 100) + 0.5)
+
+            if isinstance(moat_stats[moat]['agents'], set):
+                moat_stats[moat]['agents'].add(source)
+            else:
+                moat_stats[moat]['agents'] = {source}
+            moat_stats[moat]['patterns'] = moat_stats[moat].get('patterns', 0) + 1
+
+            if source and source != 'Unknown':
+                agent_stats[source]['patterns_discovered'] += 1
+                agent_stats[source]['policy_shares'] += 1
 
         elif msg_type == 'build-request':
             requester = data.get('requester', 'Unknown')
@@ -799,6 +542,7 @@ def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_h
             })
 
         elif msg_type == 'system-control':
+            # Track REAL HAVEN risk from system control messages
             risk_level = data.get('risk_level', haven_risk['current_risk'])
             haven_risk['current_risk'] = risk_level
             haven_risk['history'].append(risk_level)
@@ -825,14 +569,7 @@ def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_h
     if len(swarm_health['history']) > 50:
         swarm_health['history'] = swarm_health['history'][-50:]
 
-    # Update collaboration data
-    collaboration_data = {}
-    for agent_id, agent_data in agent_stats.items():
-        collaborators = agent_data.get('collaborators', [])
-        if collaborators:
-            collaboration_data[agent_id] = collaborators
-
-    return pattern_data, moat_health, activity_log, agent_stats, swarm_health, discoveries, pattern_details, moat_stats, haven_risk, collaboration_data, pattern_evolution
+    return pattern_data, moat_health, activity_log, agent_stats, swarm_health, discoveries, pattern_details, moat_stats, haven_risk
 
 # === KEY METRICS UPDATES ===
 @app.callback(
@@ -864,6 +601,7 @@ def update_key_metrics(pattern_data, swarm_health, haven_risk, agent_stats):
         health_status = "Needs Attention"
         health_color = COLORS['warning']
 
+    # Use REAL HAVEN risk from store
     risk = haven_risk['current_risk']
     if risk < 50:
         risk_level = "LOW"
@@ -875,6 +613,7 @@ def update_key_metrics(pattern_data, swarm_health, haven_risk, agent_stats):
         risk_level = "HIGH"
         risk_color = COLORS['danger']
 
+    # Count active agents (agents with data)
     active_count = len(agent_stats)
 
     return (
@@ -887,7 +626,7 @@ def update_key_metrics(pattern_data, swarm_health, haven_risk, agent_stats):
         str(active_count)
     )
 
-# === TAB RENDERER WITH ENHANCED STORYTELLING ===
+# === TAB RENDERER ===
 @app.callback(
     Output('tab-content', 'children'),
     [Input('tabs', 'active_tab')]
@@ -899,7 +638,7 @@ def render_tab_content(active_tab):
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader(html.H5("🔍 Intelligent Pattern Discovery Dashboard", style={'color': COLORS['text']})),
+                        dbc.CardHeader(html.H5("🔍 Pattern Discovery Dashboard", style={'color': COLORS['text']})),
                         dbc.CardBody([
                             html.Div(id='pattern-headlines')
                         ])
@@ -909,7 +648,7 @@ def render_tab_content(active_tab):
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader(html.H5("📋 Pattern Catalog (Semantic Analysis)", style={'color': COLORS['text']})),
+                        dbc.CardHeader(html.H5("📋 Detailed Pattern Catalog", style={'color': COLORS['text']})),
                         dbc.CardBody([
                             html.Div(id='pattern-catalog', style={
                                 'maxHeight': '500px',
@@ -926,7 +665,7 @@ def render_tab_content(active_tab):
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader(html.H5("🧠 Agent Performance Leaderboard", style={'color': COLORS['text']})),
+                        dbc.CardHeader(html.H5("🧠 Agent Performance Leaderboard (Real Data)", style={'color': COLORS['text']})),
                         dbc.CardBody([
                             dcc.Graph(id='agent-leaderboard'),
                         ])
@@ -934,7 +673,7 @@ def render_tab_content(active_tab):
                 ], width=6),
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader(html.H5("📡 Agent Collaboration Network (Real)", style={'color': COLORS['text']})),
+                        dbc.CardHeader(html.H5("📡 Agent Communication Network", style={'color': COLORS['text']})),
                         dbc.CardBody([
                             dcc.Graph(id='agent-network'),
                         ])
@@ -1015,8 +754,8 @@ def render_tab_content(active_tab):
         return dbc.Container(fluid=True, children=[
             dbc.Row([
                 dbc.Col([
-                    html.H5("🎴 Agent Card Browser (Dynamic Discovery)", style={'color': COLORS['text'], 'marginBottom': '20px'}),
-                    html.P("Browse through all discovered agents. Metadata is auto-generated from agent IDs.",
+                    html.H5("🎴 Agent Card Browser", style={'color': COLORS['text'], 'marginBottom': '20px'}),
+                    html.P("Browse through your agents like baseball cards. Use the navigation buttons to cycle through agents.",
                           style={'color': COLORS['text_muted']}),
                 ], width=12),
             ]),
@@ -1048,7 +787,7 @@ def render_tab_content(active_tab):
                 ], width=6),
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader(html.H5("🎯 Interestingness Distribution", style={'color': COLORS['text']})),
+                        dbc.CardHeader(html.H5("🎯 Interestingness Distribution (Real)", style={'color': COLORS['text']})),
                         dbc.CardBody([
                             dcc.Graph(id='interestingness-dist'),
                         ])
@@ -1069,14 +808,14 @@ def render_tab_content(active_tab):
 
     return html.Div("Select a tab")
 
-# === PATTERN HEADLINES WITH SEMANTIC DESCRIPTIONS ===
+# === PATTERN HEADLINES ===
 @app.callback(
     Output('pattern-headlines', 'children'),
     [Input('pattern-details-store', 'data')]
 )
 def update_pattern_headlines(pattern_details):
     if not pattern_details:
-        return html.P("No intelligent patterns discovered yet...", style={'color': COLORS['text_muted']})
+        return html.P("No patterns discovered yet...", style={'color': COLORS['text_muted']})
 
     # Get latest 5 patterns
     recent = pattern_details[-5:]
@@ -1088,41 +827,21 @@ def update_pattern_headlines(pattern_details):
             'Code Innovation': COLORS['success'],
             'Logistics': COLORS['warning'],
             'Government': COLORS['info'],
-            'US Corporations': COLORS['corp'],
-            'Cross-Moat': '#9333ea'
+            'US Corporations': COLORS['corp']
         }.get(p['moat'], COLORS['text'])
 
-        type_badges = {
-            'anomaly': ('⚡ Anomaly', COLORS['danger']),
-            'cluster': ('🎯 Cluster', COLORS['info']),
-            'correlation': ('🔗 Correlation', COLORS['warning']),
-            'observation': ('📊 Observation', COLORS['text_muted'])
-        }
-        badge_text, badge_color = type_badges.get(p['type'], ('📊 Pattern', COLORS['text']))
-
         headlines.append(dbc.Alert([
-            html.Div([
-                html.Span(badge_text, style={
-                    'backgroundColor': badge_color,
-                    'color': 'white',
-                    'padding': '2px 8px',
-                    'borderRadius': '12px',
-                    'fontSize': '0.75rem',
-                    'marginRight': '10px'
-                }),
-                html.Span(f" {p['moat']}", style={'color': moat_color, 'fontWeight': '600'})
+            html.H6([
+                html.I(className="fas fa-lightbulb", style={'marginRight': '10px', 'color': moat_color}),
+                f"{p['type']} in {p['moat']}"
             ], style={'marginBottom': '10px'}),
-            html.P(p['semantic_description'], style={'marginBottom': '5px', 'fontSize': '0.95rem', 'color': COLORS['text']}),
-            html.Small([
-                f"Discovered by: {', '.join(p['agents'][:3])} | ",
-                f"Confidence: {p['confidence']*100:.0f}% | ",
-                f"{p['time']}"
-            ], style={'color': COLORS['text_muted']})
+            html.P(p['pattern'], style={'marginBottom': '5px'}),
+            html.Small(f"Discovered by: {', '.join(p['agents'][:3])} | {p['time']}", style={'color': COLORS['text_muted']})
         ], color='dark', style={'marginBottom': '10px', 'borderLeft': f'4px solid {moat_color}'}))
 
     return headlines
 
-# === PATTERN CATALOG WITH RICH METADATA ===
+# === PATTERN CATALOG ===
 @app.callback(
     Output('pattern-catalog', 'children'),
     [Input('pattern-details-store', 'data')]
@@ -1131,62 +850,42 @@ def update_pattern_catalog(pattern_details):
     if not pattern_details:
         return html.P("No patterns discovered yet...", style={'color': COLORS['text_muted']})
 
-    # Group patterns by moat and type
+    # Group patterns by moat
     moat_groups = {}
     for p in pattern_details:
         moat = p['moat']
         if moat not in moat_groups:
-            moat_groups[moat] = {'anomaly': [], 'cluster': [], 'correlation': [], 'observation': []}
-        moat_groups[moat][p['type']].append(p)
+            moat_groups[moat] = []
+        moat_groups[moat].append(p)
 
     catalog = []
-    for moat, type_groups in moat_groups.items():
+    for moat, patterns in moat_groups.items():
         moat_color = {
             'Finance': COLORS['primary'],
             'Code Innovation': COLORS['success'],
             'Logistics': COLORS['warning'],
             'Government': COLORS['info'],
-            'US Corporations': COLORS['corp'],
-            'Cross-Moat': '#9333ea'
+            'US Corporations': COLORS['corp']
         }.get(moat, COLORS['text'])
 
-        total_patterns = sum(len(patterns) for patterns in type_groups.values())
-
-        moat_content = []
-        for ptype in ['anomaly', 'cluster', 'correlation', 'observation']:
-            patterns = type_groups[ptype]
-            if patterns:
-                type_header = {
-                    'anomaly': '⚡ Anomalies',
-                    'cluster': '🎯 Clusters',
-                    'correlation': '🔗 Correlations',
-                    'observation': '📊 Observations'
-                }[ptype]
-
-                moat_content.append(html.H6(f"{type_header} ({len(patterns)})",
-                                           style={'color': COLORS['text'], 'marginTop': '15px', 'marginBottom': '10px'}))
-
-                for p in reversed(patterns[-10:]):  # Show last 10 per type
-                    moat_content.append(html.P([
-                        html.Strong(f"[{p['time']}] ", style={'color': COLORS['text_muted']}),
-                        html.Span(p['semantic_description'], style={'color': COLORS['text']}),
-                        html.Br(),
-                        html.Small([
-                            f"Agents: {', '.join(p['agents'][:5])} | ",
-                            f"Effectiveness: {p['effectiveness_score']:.0f}%"
-                        ], style={'color': COLORS['text_muted']})
-                    ], style={'marginBottom': '10px', 'paddingLeft': '10px', 'borderLeft': f'2px solid {moat_color}'}))
-
         catalog.append(dbc.Card([
-            dbc.CardHeader(html.H6(f"{moat} ({total_patterns} patterns)", style={'color': moat_color})),
-            dbc.CardBody(moat_content if moat_content else [
-                html.P("No patterns yet", style={'color': COLORS['text_muted']})
+            dbc.CardHeader(html.H6(f"{moat} ({len(patterns)} patterns)", style={'color': moat_color})),
+            dbc.CardBody([
+                html.Div([
+                    html.P([
+                        html.Strong(f"[{p['time']}] ", style={'color': COLORS['text_muted']}),
+                        html.Span(p['pattern'], style={'color': COLORS['text']}),
+                        html.Br(),
+                        html.Small(f"Agents: {', '.join(p['agents'][:5])}", style={'color': COLORS['text_muted']})
+                    ], style={'marginBottom': '10px', 'paddingLeft': '10px', 'borderLeft': f'2px solid {moat_color}'})
+                    for p in reversed(patterns[-20:])  # Show last 20 per moat
+                ])
             ])
         ], style={'backgroundColor': COLORS['background'], 'marginBottom': '15px'}))
 
     return catalog
 
-# === AGENT LEADERBOARD (DYNAMIC METADATA) ===
+# === AGENT LEADERBOARD (REAL DATA) ===
 @app.callback(
     Output('agent-leaderboard', 'figure'),
     [Input('agent-stats-store', 'data')]
@@ -1195,15 +894,15 @@ def update_agent_leaderboard(agent_stats):
     if not agent_stats:
         return go.Figure()
 
-    # Calculate real interestingness scores with DYNAMIC metadata
+    # Calculate real interestingness scores
     scores = []
     for agent_id, agent_data in agent_stats.items():
-        interest_score = calculate_interestingness(agent_data, agent_stats)
-        agent_meta = discover_agent_metadata(agent_id)
-        scores.append((agent_id, agent_meta['name'], interest_score))
+        if agent_id in AGENT_INFO:
+            interest_score = calculate_interestingness(agent_data, agent_stats)
+            scores.append((agent_id, interest_score))
 
     # Sort and take top 15
-    scores.sort(key=lambda x: x[2], reverse=True)
+    scores.sort(key=lambda x: x[1], reverse=True)
     scores = scores[:15]
 
     if not scores:
@@ -1211,36 +910,33 @@ def update_agent_leaderboard(agent_stats):
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        y=[s[1] for s in scores],  # Use friendly name
-        x=[s[2] for s in scores],
+        y=[AGENT_INFO[a[0]]['name'] for a in scores],
+        x=[a[1] for a in scores],
         orientation='h',
-        marker=dict(color=[s[2] for s in scores], colorscale='Purples', showscale=False),
-        text=[f"{s[2]:.1f}" for s in scores],
-        textposition='outside',
-        hovertext=[s[0] for s in scores],  # Show full ID on hover
-        hoverinfo='text+x'
+        marker=dict(color=[a[1] for a in scores], colorscale='Purples', showscale=False),
+        text=[f"{a[1]:.1f}" for a in scores],
+        textposition='outside'
     ))
 
     fig.update_layout(
-        title=dict(text="Top 15 Agents by Interestingness (Dynamic Discovery)", font=dict(color=COLORS['text'], size=14)),
+        title=dict(text="Top 15 Agents by Interestingness (Real Data)", font=dict(color=COLORS['text'], size=14)),
         plot_bgcolor=COLORS['card'],
         paper_bgcolor=COLORS['card'],
         font=dict(color=COLORS['text_muted']),
         xaxis=dict(title='Interestingness Score (0-100)', gridcolor=COLORS['border']),
         yaxis=dict(gridcolor=COLORS['border']),
-        margin=dict(l=150, r=20, t=60, b=40),
+        margin=dict(l=120, r=20, t=60, b=40),
         height=500
     )
     return fig
 
-# === AGENT COLLABORATION NETWORK (REAL COLLABORATION TRACKING) ===
+# === AGENT NETWORK ===
 @app.callback(
     Output('agent-network', 'figure'),
-    [Input('agent-stats-store', 'data'),
-     Input('collaboration-store', 'data')]
+    [Input('agent-stats-store', 'data')]
 )
-def update_agent_network(agent_stats, collaboration_data):
-    active_agents = list(agent_stats.keys())[:30]  # Show top 30
+def update_agent_network(agent_stats):
+    active_agents = list(agent_stats.keys())[:20]
     if not active_agents:
         return go.Figure()
 
@@ -1250,47 +946,33 @@ def update_agent_network(agent_stats, collaboration_data):
 
     fig = go.Figure()
 
-    # Add edges based on REAL collaboration data
-    for i, agent1 in enumerate(active_agents):
-        collaborators = collaboration_data.get(agent1, [])
-        for agent2 in collaborators:
-            if agent2 in active_agents:
-                j = active_agents.index(agent2)
-                fig.add_trace(go.Scatter(
-                    x=[x_pos[i], x_pos[j]],
-                    y=[y_pos[i], y_pos[j]],
-                    mode='lines',
-                    line=dict(color=COLORS['primary'], width=2, dash='dot'),
-                    showlegend=False,
-                    hoverinfo='skip'
-                ))
+    # Add edges
+    for i in range(num_agents - 1):
+        fig.add_trace(go.Scatter(
+            x=[x_pos[i], x_pos[i+1]],
+            y=[y_pos[i], y_pos[i+1]],
+            mode='lines',
+            line=dict(color=COLORS['border'], width=1),
+            showlegend=False,
+            hoverinfo='none'
+        ))
 
-    # Add nodes with dynamic metadata
-    node_colors = []
-    node_names = []
-    node_hovertexts = []
-    for agent_id in active_agents:
-        meta = discover_agent_metadata(agent_id)
-        node_colors.append(meta['color'])
-        node_names.append(meta['name'][:10])  # Truncate for display
-        collab_count = len(collaboration_data.get(agent_id, []))
-        node_hovertexts.append(f"{meta['name']}<br>Product: {meta['product']}<br>Collaborators: {collab_count}")
-
+    # Add nodes
     fig.add_trace(go.Scatter(
         x=x_pos,
         y=y_pos,
         mode='markers+text',
-        marker=dict(size=20, color=node_colors, line=dict(color=COLORS['text'], width=2)),
-        text=node_names,
+        marker=dict(size=15, color=COLORS['primary'], line=dict(color=COLORS['text'], width=2)),
+        text=[a.split('_')[-1][:3] for a in active_agents],
         textposition='top center',
-        textfont=dict(color=COLORS['text'], size=8),
-        hovertext=node_hovertexts,
+        textfont=dict(color=COLORS['text'], size=9),
+        hovertext=[AGENT_INFO.get(a, {'name': a})['name'] for a in active_agents],
         hoverinfo='text',
         showlegend=False
     ))
 
     fig.update_layout(
-        title=dict(text="Agent Collaboration Network (Real Connections)", font=dict(color=COLORS['text'], size=14)),
+        title=dict(text="Active Agent Network", font=dict(color=COLORS['text'], size=14)),
         plot_bgcolor=COLORS['card'],
         paper_bgcolor=COLORS['card'],
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
@@ -1300,50 +982,45 @@ def update_agent_network(agent_stats, collaboration_data):
     )
     return fig
 
-# === AGENT TYPE SUMMARY (DYNAMIC) ===
+# === AGENT TYPE SUMMARY ===
 @app.callback(
     Output('agent-type-summary', 'children'),
     [Input('agent-stats-store', 'data')]
 )
 def update_agent_type_summary(agent_stats):
-    # Count real active agents by type using dynamic discovery
-    type_counts = defaultdict(int)
+    # Count real active agents by type
+    type_counts = {'Pattern Learners': 0, 'Data Miners': 0, 'System': 0}
     for agent_id in agent_stats.keys():
-        meta = discover_agent_metadata(agent_id)
-        type_counts[meta['type']] += 1
-
-    summary_items = []
-    type_icons = {
-        'Pattern Learner': ('fa-brain', COLORS['primary'], 'Analyzing data streams, discovering correlations, sharing policies'),
-        'Data Engineer': ('fa-database', COLORS['primary'], 'Collecting market data from Finance moat'),
-        'Code Scraper': ('fa-code', COLORS['success'], 'Mining GitHub repositories for code innovation patterns'),
-        'Logistics Miner': ('fa-truck', COLORS['warning'], 'Tracking logistics flow and cargo velocity'),
-        'Government Analyst': ('fa-landmark', COLORS['info'], 'Monitoring government policy and regulatory shifts'),
-        'Corporate Analyst': ('fa-building', COLORS['corp'], 'Analyzing corporate earnings and M&A activity'),
-        'HAVEN Guardian': ('fa-shield-alt', COLORS['danger'], 'Monitoring system risk, blocking policy contagion at 85% threshold'),
-        'Evolution Engine': ('fa-cogs', '#9333ea', 'Autonomously creating new specialized agents when gaps detected'),
-        'Action Agent': ('fa-bolt', '#fbbf24', 'Executing high-confidence pattern predictions')
-    }
-
-    for agent_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True):
-        if agent_type in type_icons:
-            icon, color, activity = type_icons[agent_type]
+        if 'SwarmBrain' in agent_id:
+            type_counts['Pattern Learners'] += 1
+        elif any(x in agent_id for x in ['DataMiner', 'RepoScraper', 'LogisticsMiner', 'GovtDataMiner', 'CorpDataMiner']):
+            type_counts['Data Miners'] += 1
         else:
-            icon, color, activity = 'fa-robot', COLORS['text_muted'], 'Unknown activity'
+            type_counts['System'] += 1
 
-        summary_items.append(dbc.Card([
+    summary = [
+        {'icon': 'fa-brain', 'type': f"Pattern Learners ({type_counts['Pattern Learners']})", 'activity': 'Analyzing data streams, discovering correlations, sharing policies', 'color': COLORS['primary']},
+        {'icon': 'fa-search', 'type': f"Data Miners ({type_counts['Data Miners']})", 'activity': 'Collecting data from 5 product moats: Finance, Code, Logistics, Gov, Corp', 'color': COLORS['success']},
+        {'icon': 'fa-shield-alt', 'type': 'HAVEN Guardian (1)', 'activity': 'Monitoring system risk, blocking policy contagion at 85% threshold', 'color': COLORS['danger']},
+        {'icon': 'fa-cogs', 'type': 'Builder (1)', 'activity': 'Autonomously creating new specialized agents when gaps detected', 'color': '#9333ea'},
+        {'icon': 'fa-bolt', 'type': 'Executor (1)', 'activity': 'Executing high-confidence pattern predictions', 'color': '#fbbf24'},
+    ]
+
+    items = []
+    for s in summary:
+        items.append(dbc.Card([
             dbc.CardBody([
                 html.Div([
-                    html.I(className=f"fas {icon} fa-2x", style={'color': color, 'marginRight': '15px'}),
+                    html.I(className=f"fas {s['icon']} fa-2x", style={'color': s['color'], 'marginRight': '15px'}),
                     html.Div([
-                        html.H6(f"{agent_type} ({count})", style={'color': COLORS['text'], 'marginBottom': '5px'}),
-                        html.P(activity, style={'color': COLORS['text_muted'], 'fontSize': '0.9rem', 'marginBottom': '0'}),
+                        html.H6(s['type'], style={'color': COLORS['text'], 'marginBottom': '5px'}),
+                        html.P(s['activity'], style={'color': COLORS['text_muted'], 'fontSize': '0.9rem', 'marginBottom': '0'}),
                     ], style={'flex': 1})
                 ], style={'display': 'flex', 'alignItems': 'center'})
             ])
         ], style={'backgroundColor': COLORS['background'], 'marginBottom': '10px'}))
 
-    return summary_items
+    return items
 
 # === MOAT HEALTH CHART ===
 @app.callback(
@@ -1376,7 +1053,7 @@ def update_moat_health_chart(moat_health):
     )
     return fig
 
-# === MOAT DETAILS ===
+# === MOAT DETAILS (REAL DATA) ===
 @app.callback(
     [Output('finance-moat-detail', 'children'),
      Output('code-moat-detail', 'children'),
@@ -1435,14 +1112,13 @@ def navigate_agent_cards(prev_clicks, next_clicks, current_index, agent_stats):
 
     return current_index
 
-# === AGENT CARD DISPLAY (DYNAMIC METADATA) ===
+# === AGENT CARD DISPLAY ===
 @app.callback(
     Output('agent-card-display', 'children'),
     [Input('agent-carousel-index', 'data'),
-     Input('agent-stats-store', 'data'),
-     Input('collaboration-store', 'data')]
+     Input('agent-stats-store', 'data')]
 )
-def update_agent_card_display(carousel_index, agent_stats, collaboration_data):
+def update_agent_card_display(carousel_index, agent_stats):
     if not agent_stats:
         return html.P("No agents active yet...", style={'color': COLORS['text_muted']})
 
@@ -1451,7 +1127,7 @@ def update_agent_card_display(carousel_index, agent_stats, collaboration_data):
         carousel_index = 0
 
     agent_id = agent_list[carousel_index]
-    agent_meta = discover_agent_metadata(agent_id)  # DYNAMIC!
+    agent_info = AGENT_INFO.get(agent_id, {'name': 'Unknown', 'type': 'Unknown', 'color': COLORS['text_muted'], 'icon': 'fa-robot', 'product': 'N/A'})
     agent_data = agent_stats[agent_id]
 
     # Calculate REAL interestingness
@@ -1461,9 +1137,6 @@ def update_agent_card_display(carousel_index, agent_stats, collaboration_data):
     children_count = len([aid for aid, adata in agent_stats.items()
                          if adata.get('parent') == agent_id])
 
-    # Get collaborators
-    collaborators = collaboration_data.get(agent_id, [])
-
     # Build stats with REAL data
     stats = {
         'Interestingness Score': f"{interestingness:.1f}/100",
@@ -1472,29 +1145,22 @@ def update_agent_card_display(carousel_index, agent_stats, collaboration_data):
         'Policy Shares': agent_data.get('policy_shares', 0),
         'Parent': agent_data.get('parent', 'Genesis'),
         'Children': children_count,
-        'Collaborators': len(collaborators),
         'Status': agent_data.get('status', 'Active'),
         'Last Active': agent_data.get('last_active', 'Never')
     }
-
-    # Top 3 collaborators with friendly names
-    collab_display = []
-    for collab_id in collaborators[:3]:
-        collab_meta = discover_agent_metadata(collab_id)
-        collab_display.append(collab_meta['name'])
 
     return html.Div([
         dbc.Row([
             dbc.Col([
                 html.Div([
-                    html.I(className=f"fas {agent_meta['icon']} fa-5x", style={'color': agent_meta['color']}),
+                    html.I(className=f"fas {agent_info['icon']} fa-5x", style={'color': agent_info['color']}),
                 ], style={'textAlign': 'center', 'padding': '2rem'}),
             ], width=3),
             dbc.Col([
-                html.H3(agent_meta['name'], style={'color': agent_meta['color'], 'fontWeight': '700'}),
+                html.H3(agent_info['name'], style={'color': agent_info['color'], 'fontWeight': '700'}),
                 html.H5(f"ID: {agent_id}", style={'color': COLORS['text_muted']}),
-                html.P(f"Type: {agent_meta['type']}", style={'color': COLORS['text'], 'fontSize': '1.1rem'}),
-                html.P(f"Product Moat: {agent_meta['product']}", style={'color': COLORS['text'], 'fontSize': '1.1rem'}),
+                html.P(f"Type: {agent_info['type']}", style={'color': COLORS['text'], 'fontSize': '1.1rem'}),
+                html.P(f"Product Moat: {agent_info['product']}", style={'color': COLORS['text'], 'fontSize': '1.1rem'}),
                 html.P(f"Agent {carousel_index + 1} of {len(agent_list)}", style={'color': COLORS['text_muted'], 'fontSize': '0.9rem'}),
             ], width=9),
         ]),
@@ -1509,14 +1175,7 @@ def update_agent_card_display(carousel_index, agent_stats, collaboration_data):
                     ], style={'marginBottom': '0.5rem'})
                     for k, v in stats.items()
                 ])
-            ], width=6),
-            dbc.Col([
-                html.H5("🤝 Top Collaborators", style={'color': COLORS['success'], 'marginBottom': '1rem'}),
-                html.Div([
-                    html.P(name, style={'color': COLORS['text'], 'marginBottom': '0.5rem'})
-                    for name in (collab_display if collab_display else ['No collaborations yet'])
-                ])
-            ], width=6),
+            ], width=12),
         ]),
     ])
 
@@ -1549,7 +1208,7 @@ def update_swarm_health_chart(swarm_health):
     )
     return fig
 
-# === INTERESTINGNESS DISTRIBUTION ===
+# === INTERESTINGNESS DISTRIBUTION (REAL DATA) ===
 @app.callback(
     Output('interestingness-dist', 'figure'),
     [Input('agent-stats-store', 'data')]
@@ -1604,7 +1263,7 @@ def update_pattern_timeline(pattern_data):
     ))
 
     fig.update_layout(
-        title=dict(text="Cumulative Intelligent Pattern Discovery Timeline", font=dict(color=COLORS['text'], size=16)),
+        title=dict(text="Cumulative Pattern Discovery Timeline", font=dict(color=COLORS['text'], size=16)),
         plot_bgcolor=COLORS['card'],
         paper_bgcolor=COLORS['card'],
         font=dict(color=COLORS['text_muted']),
