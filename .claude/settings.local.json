@@ -19,7 +19,19 @@
       "Bash(docker run:*)",
       "Bash(docker rm:*)",
       "Bash(python dashboard.py:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:thepythoncodingbook.com)",
+      "Bash(find:*)",
+      "Bash(nul)",
+      "Bash(set STREAMLIT_BROWSER_GATHER_USAGE_STATS=false)",
+      "Bash(taskkill:*)",
+      "Bash(cat:*)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

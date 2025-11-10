@@ -6,15 +6,17 @@ from src.agents.data_miner_agent import DataMinerAgent
 from src.agents.trading_agent import TradingAgent
 from src.agents.risk_management_agent import RiskManagementAgent
 from src.agents.pattern_learner_agent import PatternLearnerAgent
+from src.agents.repo_scrape_agent import RepoScrapeAgent  # NEW IMPORT
+from src.agents.builder_agent import BuilderAgent  # NEW IMPORT
 import logging
 import random  # For randomized swarm strategies
 
 class MycelialModel(mesa.Model):
     """
     The main Mesa model that creates, holds, and steps all agents.
-    This implements the 100-agent Swarm architecture for Federated Reinforcement Learning (FRL).
+    It now includes all three core product lines (Finance, Code, Autonomy).
     """
-    def __init__(self, pairs_to_trade: list, num_traders: int = 1, num_risk_managers: int = 1, num_swarm_agents: int = 100):
+    def __init__(self, pairs_to_trade: list, target_repos: list = ["Python"], num_traders: int = 1, num_risk_managers: int = 1, num_swarm_agents: int = 100):
         super().__init__()
         self.running = True
         # Mesa 3.x uses built-in agent management (no scheduler needed)
@@ -32,20 +34,23 @@ class MycelialModel(mesa.Model):
         # --- Create Agent Population ---
         # Mesa 3.x: unique_id is auto-generated, no need to track it
 
-        # 1. Create Data Miners (Senses - one per pair)
+        # 1. Create Data Miners (Senses for Product 2: Finance)
         for pair in pairs_to_trade:
             miner = DataMinerAgent(self, pair_to_watch=pair)
             self.register_agent(miner)
 
-        # 2. Create Pattern Learners (THE SWARM: num_swarm_agents for BTC)
-        # This is the FRL Swarm core - 100 agents with diverse strategies
+        # 2. Create REPO SCRAPERS (Senses for Product 1: Code Moat)
+        for target in target_repos:
+            scraper = RepoScrapeAgent(self, target_language=target)
+            self.register_agent(scraper)
+
+        # 3. Create Pattern Learners (THE SWARM: 100 agents for BTC)
         btc_pair = 'XXBTZUSD'
         logging.info(f"Creating {num_swarm_agents}-agent Swarm for {btc_pair}...")
         for i in range(num_swarm_agents):
             # Introduce random seeds for strategy variance (Crucial for FRL)
-            # Using RSI and ATR parameters instead of moving averages
-            rsi_threshold = random.randint(65, 75)   # Varied RSI overbought thresholds
-            atr_multiplier = random.uniform(0.8, 1.5)  # Varied ATR sensitivity
+            rsi_threshold = random.randint(65, 75)
+            atr_multiplier = random.uniform(0.8, 1.2)
             learner = PatternLearnerAgent(self,
                                           pair_to_trade=btc_pair,
                                           rsi_threshold=rsi_threshold,
@@ -58,17 +63,21 @@ class MycelialModel(mesa.Model):
                 learner = PatternLearnerAgent(self, pair_to_trade=pair)
                 self.register_agent(learner)
 
-        # 3. Create Trading Agents (Hands)
+        # 4. Create Trading Agents (Hands)
         for i in range(num_traders):
             trader = TradingAgent(self)
             self.register_agent(trader)
 
-        # 4. Create Risk Managers (Guardians)
+        # 5. Create Risk Managers (Guardians)
         for i in range(num_risk_managers):
-            risker = RiskManagementAgent(self, max_drawdown=0.05)  # 5% drawdown
+            risker = RiskManagementAgent(self, max_drawdown=0.05)
             self.register_agent(risker)
 
-        logging.info(f"Mycelial Swarm created. Model initialized with {len(self.agents)} total agents.")
+        # 6. Create BUILDER AGENT (Autonomy)
+        builder = BuilderAgent(self)
+        self.register_agent(builder)
+
+        logging.info(f"Mycelial Swarm created. Model initialized with {len(self.agents)} total agents, including the Autonomous Builder.")
 
     def step(self):
         """
