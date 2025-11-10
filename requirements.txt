@@ -13,6 +13,7 @@ python-dotenv>=1.0.0
 # Dashboarding (for later)
 plotly>=5.0.0
 dash>=2.0.0
+dash-bootstrap-components>=1.0.0
 
 # Data Analysis
 pandas>=2.0.0
