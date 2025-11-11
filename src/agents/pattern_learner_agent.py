@@ -96,6 +96,16 @@ class PatternLearnerAgent(MycelialAgent):
             ]
 
             # 3. Log Prediction and Strategy to Vector DB
+            # BIG ROCK 33: Pattern Decay Management
+            current_time = time.time()
+            pattern_age_seconds = current_time - self.birth_timestamp
+            pattern_age_minutes = pattern_age_seconds / 60.0
+
+            # Pattern decay: 5% value loss per 10 minutes
+            decay_rate = 0.05 / 10.0  # 0.5% per minute
+            pattern_decay_factor = max(0.0, 1.0 - (pattern_age_minutes * decay_rate))
+            pattern_current_value = self.prediction_score * pattern_decay_factor * 100  # 0-100 scale
+
             # The swarm writes its current belief state (VectorDB access)
             log_data = {
                 'prediction_score': self.prediction_score,
@@ -107,7 +117,19 @@ class PatternLearnerAgent(MycelialAgent):
                 'birth_timestamp': self.birth_timestamp,
                 'agent_id': self.unique_id,
                 # --- NEW: Product Moat Diversity (Big Rock 16) ---
-                'product_focus': self.product_focus
+                'product_focus': self.product_focus,
+                # --- NEW: Pattern Decay (Big Rock 33) ---
+                'pattern_age_minutes': round(pattern_age_minutes, 2),
+                'pattern_decay_factor': round(pattern_decay_factor, 3),
+                'pattern_current_value': round(pattern_current_value, 1),
+                'pattern_created_timestamp': self.birth_timestamp,
+                # --- RAW FEATURE DATA (Big Rock 32) ---
+                'raw_features': {
+                    'RSI': round(current_rsi, 2),
+                    'ATR': round(current_atr, 2),
+                    'MOM': round(current_mom, 4),
+                    'close': round(current_close, 2)
+                }
             }
             # The Vector DB writes the current prediction for peers and dashboard to read
             if self.vector_db:  # type: ignore

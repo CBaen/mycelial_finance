@@ -34,11 +34,16 @@ class MycelialModel(mesa.Model):
                  # BIG ROCK 20: HAVEN Framework Parameters
                  risk_governance_enabled: bool = False,
                  max_drawdown_percent: float = 0.05,
-                 policy_contagion_threshold: float = 0.85,
+                 policy_contagion_threshold: float = 0.80,  # BIG ROCK 30: Lowered to 0.80 for safety buffer
                  adversarial_test_mode: bool = False,
                  regulatory_compliance_check: bool = False):
         super().__init__()
         self.running = True
+
+        # BIG ROCK 33: Pattern Archiving Tracking
+        self.step_counter = 0
+        self.archived_pattern_count = 0
+        self.archive_check_interval = 300  # Check every 5 minutes (300 steps)
 
         # Store HAVEN Framework parameters
         self.risk_governance_enabled = risk_governance_enabled
@@ -209,6 +214,11 @@ class MycelialModel(mesa.Model):
             for agent in agents_list:
                 agent.step()
 
+            # BIG ROCK 33: Pattern Archiving Check (every 5 minutes)
+            self.step_counter += 1
+            if self.step_counter % self.archive_check_interval == 0:
+                self._archive_high_value_patterns()
+
         except Exception as e:
             logging.error(f"Error during model step: {e}")
             self.running = False
@@ -224,3 +234,56 @@ class MycelialModel(mesa.Model):
             return random.uniform(0.8, 0.95)  # High risk
         else:
             return random.uniform(0.1, 0.4)  # Normal risk
+
+    def _archive_high_value_patterns(self):
+        """
+        BIG ROCK 33: Pattern Archiving for Long-Term Retention.
+        Scans Redis for high-value patterns (pattern_current_value > 50) and simulates
+        archiving them to a persistent SQL database for historical analysis.
+
+        In production, this would:
+        1. Query Redis for all policy:* keys
+        2. Parse pattern data
+        3. Filter by pattern_current_value > 50 (after decay) - BIG ROCK 30: Lowered from 75 to 50
+        4. INSERT into SQL: patterns(agent_id, timestamp, features, interestingness, decay_factor)
+        5. Optionally DELETE from Redis to free memory
+        """
+        try:
+            # Scan for all agent policies in Redis
+            pattern_keys = self.redis_client.connection.keys("policy:*")
+            high_value_patterns = []
+
+            for key in pattern_keys:
+                policy_data = self.redis_client.connection.get(key)
+                if policy_data:
+                    import json
+                    policy = json.loads(policy_data)
+                    pattern_value = policy.get('pattern_current_value', 0)
+
+                    # Archive threshold: 50+ value (after decay) - BIG ROCK 30
+                    if pattern_value >= 50:
+                        high_value_patterns.append({
+                            'agent_id': policy.get('agent_id'),
+                            'pattern_value': pattern_value,
+                            'raw_features': policy.get('raw_features', {}),
+                            'age_minutes': policy.get('pattern_age_minutes', 0),
+                            'decay_factor': policy.get('pattern_decay_factor', 1.0)
+                        })
+
+            if high_value_patterns:
+                self.archived_pattern_count += len(high_value_patterns)
+                elapsed_minutes = self.step_counter // 60
+                logging.info(f"[ARCHIVE] Step {self.step_counter} ({elapsed_minutes}min): "
+                           f"Found {len(high_value_patterns)} high-value patterns (>50 after decay). "
+                           f"Total archived: {self.archived_pattern_count}")
+
+                # In production: INSERT into SQL database here
+                # for pattern in high_value_patterns:
+                #     cursor.execute("INSERT INTO patterns (agent_id, value, features, timestamp) VALUES (?, ?, ?, ?)",
+                #                   (pattern['agent_id'], pattern['pattern_value'], json.dumps(pattern['raw_features']), time.time()))
+            else:
+                elapsed_minutes = self.step_counter // 60
+                logging.info(f"[ARCHIVE] Step {self.step_counter} ({elapsed_minutes}min): No high-value patterns to archive (threshold: 50)")
+
+        except Exception as e:
+            logging.error(f"[ARCHIVE] Error during pattern archiving: {e}")

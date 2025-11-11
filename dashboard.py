@@ -620,21 +620,37 @@ def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_h
 
         source = data.get('source', 'Unknown')
 
-        # Initialize agent stats if not exists
+        # Initialize agent stats if not exists (BIG ROCK 31: Pull from actual agent data)
         if source and source != 'Unknown':
             if source not in agent_stats:
+                # Extract real agent data from message
+                generation = data.get('generation', 0)
+                parent_id = data.get('parent_id', None)
+                parent_name = f"Agent_{parent_id}" if parent_id else 'Genesis'
+                strategy_vector = data.get('strategy_vector', [0.0, 0.0, 0.0, 0.0])
+
                 agent_stats[source] = {
                     'patterns_discovered': 0,
                     'policy_shares': 0,
                     'last_active': timestamp,
-                    'generation': 0,
-                    'parent': 'Genesis',
+                    'generation': generation,
+                    'parent': parent_name,
                     'children': [],
                     'status': 'Active',
-                    'vector': [0.0, 0.0, 0.0, 0.0],
+                    'vector': strategy_vector,
                     'id': source,
-                    'collaborators': []  # NEW: Track collaboration partners
+                    'collaborators': []
                 }
+            else:
+                # Update dynamic fields from latest message
+                if 'generation' in data:
+                    agent_stats[source]['generation'] = data.get('generation', agent_stats[source]['generation'])
+                if 'strategy_vector' in data:
+                    agent_stats[source]['vector'] = data.get('strategy_vector', agent_stats[source]['vector'])
+                if 'parent_id' in data:
+                    parent_id = data.get('parent_id')
+                    agent_stats[source]['parent'] = f"Agent_{parent_id}" if parent_id else agent_stats[source]['parent']
+
             agent_stats[source]['last_active'] = timestamp
 
         # === INTELLIGENT PATTERN PROCESSING ===
@@ -737,23 +753,30 @@ def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_h
             pattern_data['total_patterns'] += 1
             moat_health[moat] = min(100, moat_health.get(moat, 100) + 0.5)
 
-            # Track moat stats
-            if isinstance(moat_stats[moat]['agents'], set):
-                moat_stats[moat]['agents'].add(source)
+            # Track moat stats (BIG ROCK 27: Use lists for JSON compatibility)
+            if isinstance(moat_stats[moat]['agents'], list):
+                if source not in moat_stats[moat]['agents']:
+                    moat_stats[moat]['agents'].append(source)
             else:
-                moat_stats[moat]['agents'] = {source}
+                moat_stats[moat]['agents'] = [source]
             moat_stats[moat]['patterns'] = moat_stats[moat].get('patterns', 0) + 1
 
+            # BIG ROCK 31: Track patterns_discovered (data observations)
             if source and source != 'Unknown':
                 agent_stats[source]['patterns_discovered'] += 1
-                agent_stats[source]['policy_shares'] += 1
+                # Policy shares tracked separately below for actual policy sharing events
 
         elif msg_type == 'intelligent-pattern':
             # Handle intelligent patterns published by PatternLearner agents
+            # BIG ROCK 31: This is actual policy sharing (high-confidence patterns shared with swarm)
             pattern_type = data.get('pattern_type', 'discovery')
             description = data.get('description', 'Pattern discovered')
             confidence = data.get('confidence', 0.5)
             related_agents = data.get('related_agents', [source])
+
+            # Track policy shares for source agent (actively sharing with swarm)
+            if source and source != 'Unknown' and source in agent_stats:
+                agent_stats[source]['policy_shares'] += 1
 
             # Track collaboration
             if len(related_agents) > 1:
@@ -1100,6 +1123,9 @@ def update_pattern_headlines(pattern_details):
         }
         badge_text, badge_color = type_badges.get(p['type'], ('📊 Pattern', COLORS['text']))
 
+        # BIG ROCK 32: Show RAW PATTERN DATA instead of vague descriptions
+        pattern_raw = p.get('pattern', 'No data')  # e.g., "close: 94.24 | RSI: 72.3 | ATR: 1.45"
+
         headlines.append(dbc.Alert([
             html.Div([
                 html.Span(badge_text, style={
@@ -1112,10 +1138,16 @@ def update_pattern_headlines(pattern_details):
                 }),
                 html.Span(f" {p['moat']}", style={'color': moat_color, 'fontWeight': '600'})
             ], style={'marginBottom': '10px'}),
-            html.P(p['semantic_description'], style={'marginBottom': '5px', 'fontSize': '0.95rem', 'color': COLORS['text']}),
+            # Show RAW data instead of semantic description
+            html.P([
+                html.Strong("Raw Data: ", style={'color': COLORS['text_muted']}),
+                html.Span(pattern_raw, style={'color': COLORS['text'], 'fontFamily': 'monospace'})
+            ], style={'marginBottom': '5px', 'fontSize': '0.9rem'}),
+            html.P(p['semantic_description'], style={'marginBottom': '5px', 'fontSize': '0.85rem', 'color': COLORS['text_muted'], 'fontStyle': 'italic'}),
             html.Small([
-                f"Discovered by: {', '.join(p['agents'][:3])} | ",
+                f"Agents: {', '.join(p['agents'][:3])} | ",
                 f"Confidence: {p['confidence']*100:.0f}% | ",
+                f"Effectiveness: {p.get('effectiveness_score', 0):.0f}% | ",
                 f"{p['time']}"
             ], style={'color': COLORS['text_muted']})
         ], color='dark', style={'marginBottom': '10px', 'borderLeft': f'4px solid {moat_color}'}))
@@ -1167,15 +1199,20 @@ def update_pattern_catalog(pattern_details):
                                            style={'color': COLORS['text'], 'marginTop': '15px', 'marginBottom': '10px'}))
 
                 for p in reversed(patterns[-10:]):  # Show last 10 per type
+                    # BIG ROCK 32: Show RAW pattern data
+                    pattern_raw = p.get('pattern', 'No raw data available')
                     moat_content.append(html.P([
                         html.Strong(f"[{p['time']}] ", style={'color': COLORS['text_muted']}),
-                        html.Span(p['semantic_description'], style={'color': COLORS['text']}),
+                        html.Span(pattern_raw, style={'color': COLORS['text'], 'fontFamily': 'monospace', 'fontSize': '0.9rem'}),
+                        html.Br(),
+                        html.Small(p['semantic_description'], style={'color': COLORS['text_muted'], 'fontStyle': 'italic'}),
                         html.Br(),
                         html.Small([
                             f"Agents: {', '.join(p['agents'][:5])} | ",
+                            f"Confidence: {p.get('confidence', 0)*100:.0f}% | ",
                             f"Effectiveness: {p['effectiveness_score']:.0f}%"
                         ], style={'color': COLORS['text_muted']})
-                    ], style={'marginBottom': '10px', 'paddingLeft': '10px', 'borderLeft': f'2px solid {moat_color}'}))
+                    ], style={'marginBottom': '15px', 'paddingLeft': '10px', 'borderLeft': f'2px solid {moat_color}'}))
 
         catalog.append(dbc.Card([
             dbc.CardHeader(html.H6(f"{moat} ({total_patterns} patterns)", style={'color': moat_color})),
@@ -1390,8 +1427,8 @@ def update_moat_details(moat_health, moat_stats):
     def create_detail(moat_name):
         health = moat_health.get(moat_name, 100)
         patterns = moat_stats.get(moat_name, {}).get('patterns', 0)
-        agents_set = moat_stats.get(moat_name, {}).get('agents', set())
-        agents_count = len(agents_set) if isinstance(agents_set, set) else 0
+        agents_list = moat_stats.get(moat_name, {}).get('agents', [])
+        agents_count = len(agents_list) if isinstance(agents_list, list) else 0
 
         return html.Div([
             html.P(f"Health: {health:.0f}%", style={'color': COLORS['text'], 'fontSize': '1.2rem', 'fontWeight': '600'}),
@@ -1464,12 +1501,19 @@ def update_agent_card_display(carousel_index, agent_stats, collaboration_data):
     # Get collaborators
     collaborators = collaboration_data.get(agent_id, [])
 
-    # Build stats with REAL data
+    # Build stats with REAL data (BIG ROCK 33: Include Pattern Decay)
+    pattern_age_minutes = agent_data.get('pattern_age_minutes', 0)
+    pattern_decay_factor = agent_data.get('pattern_decay_factor', 1.0)
+    pattern_current_value = agent_data.get('pattern_current_value', 0)
+
     stats = {
         'Interestingness Score': f"{interestingness:.1f}/100",
         'Generation': agent_data.get('generation', 0),
         'Patterns Discovered': agent_data.get('patterns_discovered', 0),
         'Policy Shares': agent_data.get('policy_shares', 0),
+        'Pattern Age': f"{pattern_age_minutes:.1f} min" if pattern_age_minutes else "N/A",
+        'Pattern Decay': f"{(1-pattern_decay_factor)*100:.1f}% decayed" if pattern_decay_factor < 1.0 else "Fresh",
+        'Current Value': f"{pattern_current_value:.1f}/100" if pattern_current_value else "N/A",
         'Parent': agent_data.get('parent', 'Genesis'),
         'Children': children_count,
         'Collaborators': len(collaborators),

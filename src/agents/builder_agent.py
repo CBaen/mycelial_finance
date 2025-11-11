@@ -1,4 +1,4 @@
-# src/agents/builder_agent.py
+# src/agents/builder_agent.py - BIG ROCK 30: Request Deduplication
 import logging
 from .base_agent import MycelialAgent
 import time
@@ -8,15 +8,22 @@ class BuilderAgent(MycelialAgent):
     The autonomous agent responsible for monitoring the system's needs
     and triggering the creation of new tools or agents.
     It embodies the highest level of Agentic Autonomy (Self-Building).
+
+    BIG ROCK 30: Implements request deduplication with 60-second TTL
+    to prevent duplicate build requests from flooding the logs.
     """
     def __init__(self, model):
         super().__init__(model)
         self.name = f"AutonomousBuilder_{self.unique_id}"
         self.request_channel = "system-build-request"
 
+        # BIG ROCK 30: Request deduplication cache (tool_name -> timestamp)
+        self.request_cache = {}
+        self.request_ttl = 60  # 60-second TTL for duplicate detection
+
         # Listen for system build requests from the Swarm
         self._register_listener(self.request_channel, self.handle_build_request)
-        logging.info(f"[{self.name}] Initialized. Monitoring for build requests.")
+        logging.info(f"[{self.name}] Initialized. Monitoring for build requests (with 60s deduplication).")
 
     def step(self):
         """The BuilderAgent is purely reactive to requests."""
@@ -26,9 +33,30 @@ class BuilderAgent(MycelialAgent):
         """
         Processes requests from Swarm Brains that identify a missing tool or data source.
         This is the moment of Agent Autonomy.
+
+        BIG ROCK 30: Implements 60-second deduplication to prevent log spam.
         """
         tool_needed = message.get('tool_needed', 'UNKNOWN')
         reason = message.get('reason', 'None provided')
+
+        # BIG ROCK 30: Deduplication check
+        current_time = time.time()
+
+        # Clean up expired cache entries (older than TTL)
+        expired_tools = [tool for tool, timestamp in self.request_cache.items()
+                        if current_time - timestamp > self.request_ttl]
+        for tool in expired_tools:
+            del self.request_cache[tool]
+
+        # Check if this tool was recently requested
+        if tool_needed in self.request_cache:
+            time_since_last_request = current_time - self.request_cache[tool_needed]
+            # Silently ignore duplicate request within TTL window
+            logging.debug(f"[{self.name}] Duplicate request for {tool_needed} ignored (last request {time_since_last_request:.1f}s ago)")
+            return
+
+        # New unique request - process and cache it
+        self.request_cache[tool_needed] = current_time
 
         logging.critical(f"[{self.name}] 🚨 BUILD REQUEST RECEIVED! 🚨")
         logging.critical(f"[{self.name}] TARGET: New DataMiner for {tool_needed}")
