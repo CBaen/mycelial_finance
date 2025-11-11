@@ -1,4 +1,4 @@
-# src/core/model.py - BIG ROCK 20: HAVEN Framework & Adversarial Testing
+# src/core/model.py - BIG ROCK 32: Final Collaborative Architecture
 import mesa
 from src.connectors.redis_client import RedisClient
 from src.connectors.kraken_client import KrakenClient
@@ -11,16 +11,25 @@ from src.agents.builder_agent import BuilderAgent
 from src.agents.logistics_miner_agent import LogisticsMinerAgent
 from src.agents.govt_data_miner_agent import GovtDataMinerAgent
 from src.agents.corp_data_miner_agent import CorpDataMinerAgent
+# BIG ROCK 32: New Collaborative Agents
+from src.agents.mycelial_instigator_agent import MycelialInstigatorAgent
+from src.agents.deep_research_agent import DeepResearchAgent
 import logging
 import random
+import sqlite3  # BIG ROCK 31: SQL Persistence
+import json
+import time
+import threading  # BIG ROCK 31: Graceful Shutdown
 
 class MycelialModel(mesa.Model):
     """
     The main Mesa model that creates, holds, and steps all agents.
-    BIG ROCK 20: Systemic Risk Hardening with HAVEN Framework.
-    - Toxic agent injection for adversarial testing
-    - Policy contagion threshold enforcement
-    - Regulatory compliance monitoring
+    BIG ROCK 32: Final Collaborative Architecture with Rule of 3 and Redundant Validation.
+    - HAVEN Framework: Risk governance and policy contagion controls
+    - SQL Persistence: High-value pattern archiving
+    - Graceful Shutdown: Emergency stop mechanism
+    - Rule of 3: Collaborative decision enforcement (Instigator Agents)
+    - Redundant Validation: Pattern quality verification (Deep Research Agents)
     """
     def __init__(self,
                  pairs_to_trade: list,
@@ -36,7 +45,10 @@ class MycelialModel(mesa.Model):
                  max_drawdown_percent: float = 0.05,
                  policy_contagion_threshold: float = 0.80,  # BIG ROCK 30: Lowered to 0.80 for safety buffer
                  adversarial_test_mode: bool = False,
-                 regulatory_compliance_check: bool = False):
+                 regulatory_compliance_check: bool = False,
+                 # BIG ROCK 32: Collaborative Architecture Parameters
+                 num_instigators: int = 3,  # Rule of 3 Collaboration Enforcement
+                 num_research_agents: int = 3):  # Redundant Pattern Validation
         super().__init__()
         self.running = True
 
@@ -76,6 +88,40 @@ class MycelialModel(mesa.Model):
             logging.critical("Failed to initialize clients. Model will not start.")
             self.running = False
             return
+
+        # BIG ROCK 31: SQL Database Initialization (Pattern Persistence)
+        self.db_connection = None
+        self.db_cursor = None
+        try:
+            self.db_connection = sqlite3.connect('mycelial_patterns.db', check_same_thread=False)
+            self.db_cursor = self.db_connection.cursor()
+
+            # Create patterns table if it doesn't exist
+            self.db_cursor.execute('''
+                CREATE TABLE IF NOT EXISTS patterns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    agent_id INTEGER NOT NULL,
+                    timestamp REAL NOT NULL,
+                    pattern_value REAL NOT NULL,
+                    raw_features TEXT NOT NULL,
+                    age_minutes REAL NOT NULL,
+                    decay_factor REAL NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            self.db_connection.commit()
+            logging.info("[SQL] Pattern database initialized: mycelial_patterns.db")
+        except Exception as e:
+            logging.error(f"[SQL] Failed to initialize database: {e}")
+            self.db_connection = None
+            self.db_cursor = None
+
+        # BIG ROCK 31: Graceful Shutdown Listener (Emergency Stop)
+        try:
+            self.redis_client.pubsub.subscribe(**{"system-control": self._handle_system_control})
+            logging.info("[SHUTDOWN] Emergency shutdown listener registered on 'system-control' channel")
+        except Exception as e:
+            logging.warning(f"[SHUTDOWN] Failed to register shutdown listener: {e}")
 
         # --- Create Agent Population ---
 
@@ -173,8 +219,19 @@ class MycelialModel(mesa.Model):
         builder = BuilderAgent(self)
         self.register_agent(builder)
 
+        # 10. BIG ROCK 32: Create MYCELIAL INSTIGATOR AGENTS (Rule of 3 Collaboration)
+        for i in range(num_instigators):
+            instigator = MycelialInstigatorAgent(self)
+            self.register_agent(instigator)
+
+        # 11. BIG ROCK 32: Create DEEP RESEARCH AGENTS (Redundant Pattern Validation)
+        for i in range(num_research_agents):
+            researcher = DeepResearchAgent(self)
+            self.register_agent(researcher)
+
         agent_count = len(self.agents)
         logging.info(f"Mycelial Swarm created. Model initialized with {agent_count} total agents, covering ALL 5 Product Pillars: Finance, Code, Logistics, Government, and Corporations.")
+        logging.info(f"[BIG ROCK 32] Collaborative Architecture: {num_instigators} Instigator Agents + {num_research_agents} Deep Research Agents deployed")
 
         if self.risk_governance_enabled:
             logging.info("=" * 80)
@@ -235,18 +292,57 @@ class MycelialModel(mesa.Model):
         else:
             return random.uniform(0.1, 0.4)  # Normal risk
 
+    def _handle_system_control(self, message: dict):
+        """
+        BIG ROCK 31: Graceful Shutdown Handler.
+        Listens for EMERGENCY_SHUTDOWN command and halts all operations safely.
+        """
+        try:
+            command = message.get('command', '')
+
+            if command == 'EMERGENCY_SHUTDOWN':
+                reason = message.get('reason', 'User initiated')
+                logging.critical("=" * 80)
+                logging.critical("[EMERGENCY SHUTDOWN] System halt initiated!")
+                logging.critical(f"[EMERGENCY SHUTDOWN] Reason: {reason}")
+                logging.critical("=" * 80)
+
+                # Broadcast HALT_TRADING to all agents
+                self.redis_client.publish("system-control", {
+                    "command": "HALT_TRADING",
+                    "reason": f"Emergency shutdown: {reason}"
+                })
+
+                # Archive final patterns before shutdown
+                logging.info("[SHUTDOWN] Archiving final patterns...")
+                self._archive_high_value_patterns()
+
+                # Close database connection
+                if self.db_connection:
+                    self.db_connection.commit()
+                    self.db_connection.close()
+                    logging.info("[SHUTDOWN] Database connection closed safely")
+
+                # Stop model execution
+                self.running = False
+                logging.critical("[SHUTDOWN] Model stopped. System is safe to exit.")
+
+        except Exception as e:
+            logging.error(f"[SHUTDOWN] Error during emergency shutdown: {e}")
+
     def _archive_high_value_patterns(self):
         """
-        BIG ROCK 33: Pattern Archiving for Long-Term Retention.
-        Scans Redis for high-value patterns (pattern_current_value > 50) and simulates
-        archiving them to a persistent SQL database for historical analysis.
+        BIG ROCK 31: Pattern Archiving with SQL Persistence.
+        BIG ROCK 34: Archive threshold lowered to 40 for faster pattern discovery.
+        Scans Redis for high-value patterns (pattern_current_value > 40) and persists
+        them to SQLite database for long-term historical analysis.
 
-        In production, this would:
+        Process:
         1. Query Redis for all policy:* keys
         2. Parse pattern data
-        3. Filter by pattern_current_value > 50 (after decay) - BIG ROCK 30: Lowered from 75 to 50
-        4. INSERT into SQL: patterns(agent_id, timestamp, features, interestingness, decay_factor)
-        5. Optionally DELETE from Redis to free memory
+        3. Filter by pattern_current_value > 40 (after decay) - BIG ROCK 34: Lowered from 50 to 40
+        4. INSERT into SQL: patterns(agent_id, timestamp, pattern_value, raw_features, age_minutes, decay_factor)
+        5. Commit transaction for durability
         """
         try:
             # Scan for all agent policies in Redis
@@ -256,12 +352,11 @@ class MycelialModel(mesa.Model):
             for key in pattern_keys:
                 policy_data = self.redis_client.connection.get(key)
                 if policy_data:
-                    import json
                     policy = json.loads(policy_data)
                     pattern_value = policy.get('pattern_current_value', 0)
 
-                    # Archive threshold: 50+ value (after decay) - BIG ROCK 30
-                    if pattern_value >= 50:
+                    # Archive threshold: 40+ value (after decay) - BIG ROCK 34
+                    if pattern_value >= 40:
                         high_value_patterns.append({
                             'agent_id': policy.get('agent_id'),
                             'pattern_value': pattern_value,
@@ -274,16 +369,37 @@ class MycelialModel(mesa.Model):
                 self.archived_pattern_count += len(high_value_patterns)
                 elapsed_minutes = self.step_counter // 60
                 logging.info(f"[ARCHIVE] Step {self.step_counter} ({elapsed_minutes}min): "
-                           f"Found {len(high_value_patterns)} high-value patterns (>50 after decay). "
+                           f"Found {len(high_value_patterns)} high-value patterns (>40 after decay). "
                            f"Total archived: {self.archived_pattern_count}")
 
-                # In production: INSERT into SQL database here
-                # for pattern in high_value_patterns:
-                #     cursor.execute("INSERT INTO patterns (agent_id, value, features, timestamp) VALUES (?, ?, ?, ?)",
-                #                   (pattern['agent_id'], pattern['pattern_value'], json.dumps(pattern['raw_features']), time.time()))
+                # BIG ROCK 31: SQL Persistence (Production Implementation)
+                if self.db_cursor and self.db_connection:
+                    for pattern in high_value_patterns:
+                        try:
+                            self.db_cursor.execute(
+                                """INSERT INTO patterns
+                                   (agent_id, timestamp, pattern_value, raw_features, age_minutes, decay_factor)
+                                   VALUES (?, ?, ?, ?, ?, ?)""",
+                                (
+                                    pattern['agent_id'],
+                                    time.time(),
+                                    pattern['pattern_value'],
+                                    json.dumps(pattern['raw_features']),
+                                    pattern['age_minutes'],
+                                    pattern['decay_factor']
+                                )
+                            )
+                        except Exception as insert_error:
+                            logging.error(f"[ARCHIVE] Failed to insert pattern for agent {pattern['agent_id']}: {insert_error}")
+
+                    # Commit all inserts in a single transaction
+                    self.db_connection.commit()
+                    logging.info(f"[SQL] {len(high_value_patterns)} patterns persisted to database")
+                else:
+                    logging.warning("[ARCHIVE] Database not available - patterns not persisted")
             else:
                 elapsed_minutes = self.step_counter // 60
-                logging.info(f"[ARCHIVE] Step {self.step_counter} ({elapsed_minutes}min): No high-value patterns to archive (threshold: 50)")
+                logging.info(f"[ARCHIVE] Step {self.step_counter} ({elapsed_minutes}min): No high-value patterns to archive (threshold: 40)")
 
         except Exception as e:
             logging.error(f"[ARCHIVE] Error during pattern archiving: {e}")
