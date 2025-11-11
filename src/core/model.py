@@ -414,6 +414,25 @@ class MycelialModel(mesa.Model):
                     # Commit all inserts in a single transaction
                     self.db_connection.commit()
                     logging.info(f"[SQL] {len(high_value_patterns)} patterns persisted to database")
+
+                    # BIG ROCK 40: Send validation requests to Deep Research agents
+                    for pattern in high_value_patterns:
+                        validation_request = {
+                            'pattern_id': f"{pattern['agent_id']}_{int(time.time())}",
+                            'pattern_data': {
+                                'agent_id': pattern['agent_id'],
+                                'pattern_value': pattern['pattern_value'],
+                                'prediction_score': pattern['pattern_value'] / 100.0,  # Normalize to 0-1
+                                'interestingness_score': min(pattern['pattern_value'] * 1.2, 100),  # Boost for archived patterns
+                                'raw_features': pattern['raw_features'],
+                                'age_minutes': pattern['age_minutes'],
+                                'decay_factor': pattern['decay_factor']
+                            },
+                            'timestamp': time.time()
+                        }
+                        self.redis_client.publish("pattern-validation-request", json.dumps(validation_request))
+
+                    logging.info(f"[VALIDATION] Sent {len(high_value_patterns)} validation requests to Deep Research agents")
                 else:
                     logging.warning("[ARCHIVE] Database not available - patterns not persisted")
             else:

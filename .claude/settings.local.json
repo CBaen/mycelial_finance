@@ -44,7 +44,8 @@
       "Bash(python test_system.py:*)",
       "Bash(exit 0)",
       "Bash(powershell:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(sqlite3:*)"
     ],
     "deny": [],
     "ask": []

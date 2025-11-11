@@ -1,33 +1,43 @@
-# src/agents/pattern_learner_agent.py
+# src/agents/pattern_learner_agent.py - BIG ROCK 41: Alpha Tournament (ProfitSeekerAgent)
 import logging
 from .base_agent import MycelialAgent
 import pandas as pd
 import time
 import random
-import numpy as np  # NEW IMPORT for vector data
-import json  # NEW IMPORT for Vector DB serialization
+import numpy as np
+import json
+from collections import deque
 
 class PatternLearnerAgent(MycelialAgent):
     """
-    This is the "brain" of the system. It now analyzes the rich feature set
-    (RSI, ATR, Momentum) to make trading decisions, preparing for FRL.
+    BIG ROCK 41: ProfitSeekerAgent - The Alpha Tournament Engine
+
+    This agent now calculates Simulated P&L for every pattern and publishes
+    high-P&L trade ideas to the 'trade-ideas' channel for the Trading Agent
+    to execute after cross-referencing with TA signals.
     """
     def __init__(self, model, pair_to_trade: str = "XXBTZUSD", product_focus: str = "Finance", rsi_threshold: int = 70, atr_multiplier: float = 1.0, parent_id: int | None = None, generation: int = 0):
         super().__init__(model)
         self.pair = pair_to_trade
-        self.product_focus = product_focus  # "Finance", "Code", or "Logistics"
+        self.product_focus = product_focus
         self.name = f"SwarmBrain_{self.unique_id}_{product_focus}"
 
-        # --- NEW: Lineage Tracking for Evolution Moat (Big Rock 10) ---
-        self.parent_id = parent_id  # None for initial generation
-        self.generation = generation  # 0 for initial, increments with evolution
-        self.birth_timestamp = time.time()  # Track agent lifecycle
+        # Lineage Tracking for Evolution Moat
+        self.parent_id = parent_id
+        self.generation = generation
+        self.birth_timestamp = time.time()
 
-        # Strategy parameters (using features instead of SMAs)
-        # We add randomization for strategy variance (Crucial for FRL)
+        # Strategy parameters with randomization for variance
         self.rsi_threshold = rsi_threshold + random.randint(-5, 5)
         self.atr_multiplier = atr_multiplier * random.uniform(0.8, 1.2)
         self.position = "FLAT"
+
+        # BIG ROCK 41: P&L Tracking for Profit-Seeking
+        self.trade_history = deque(maxlen=100)  # Last 100 simulated trades
+        self.total_pnl = 0.0
+        self.win_rate = 0.0
+        self.entry_price = 0.0
+        self.trade_count = 0
 
         # Channels - Subscribe to appropriate data source based on product focus (5 PILLARS)
         if product_focus == "Finance":
@@ -159,39 +169,105 @@ class PatternLearnerAgent(MycelialAgent):
         except Exception as e:
             logging.error(f"[{self.name}] Error in strategy logic: {e}")
 
+    def calculate_simulated_pnl(self, direction: str, current_price: float):
+        """
+        BIG ROCK 41: Backtest the trade and calculate Simulated P&L
+
+        This function simulates what would happen if we executed this trade,
+        tracking P&L to determine if this pattern is worth executing.
+        """
+        simulated_pnl = 0.0
+
+        if direction == "buy":
+            # Opening a LONG position
+            self.entry_price = current_price
+            self.trade_count += 1
+            # P&L is 0 on entry
+            simulated_pnl = 0.0
+
+        elif direction == "sell" and self.entry_price > 0:
+            # Closing a LONG position - calculate realized P&L
+            # P&L = (Exit Price - Entry Price) / Entry Price * 100 (percentage)
+            simulated_pnl = ((current_price - self.entry_price) / self.entry_price) * 100
+
+            # Update cumulative stats
+            self.total_pnl += simulated_pnl
+            self.trade_history.append({
+                'timestamp': time.time(),
+                'direction': direction,
+                'entry_price': self.entry_price,
+                'exit_price': current_price,
+                'pnl': simulated_pnl
+            })
+
+            # Update win rate
+            wins = sum(1 for trade in self.trade_history if trade['pnl'] > 0)
+            self.win_rate = (wins / len(self.trade_history)) * 100 if self.trade_history else 0.0
+
+            # Reset entry price
+            self.entry_price = 0.0
+
+        return simulated_pnl
+
     def send_order(self, direction: str, current_close: float = 0):
         """
-        BIG ROCK 28: Send order with Interestingness Score for Trader filtering.
-        Calculates local interestingness based on agent's performance metrics.
+        BIG ROCK 41: Send order with Simulated P&L to 'trade-ideas' channel.
+        Only high-P&L ideas are published for the Profit Gateway to evaluate.
         """
-        # Calculate simplified Interestingness Score (0-100 scale)
+        # BIG ROCK 41: Calculate Simulated P&L via backtesting
+        simulated_pnl = self.calculate_simulated_pnl(direction, current_close)
+
+        # Calculate Interestingness Score (now includes P&L performance)
         # Components:
-        # 1. Performance (50%): Prediction score scaled to 0-50
-        # 2. Confidence (30%): How extreme the decision is (scaled to 0-30)
-        # 3. Activity (20%): Generation bonus (scaled to 0-20)
+        # 1. Performance (40%): Prediction score scaled to 0-40
+        # 2. P&L History (40%): Total P&L contribution (0-40)
+        # 3. Confidence (20%): How extreme the decision is (0-20)
 
-        performance_score = self.prediction_score * 50  # 0-50 range
-        confidence_score = min(abs(self.prediction_score - 0.5) * 60, 30)  # How far from neutral (0-30)
-        activity_score = min(self.generation * 2 + 10, 20)  # Evolution bonus (0-20)
+        performance_score = self.prediction_score * 40  # 0-40 range
+        pnl_score = min(max(self.total_pnl, -20), 20) + 20  # Normalize -20 to +20 -> 0 to 40
+        confidence_score = min(abs(self.prediction_score - 0.5) * 40, 20)  # 0-20
 
-        interestingness_score = performance_score + confidence_score + activity_score
+        interestingness_score = performance_score + pnl_score + confidence_score
 
-        order_message = {
+        # BIG ROCK 41: Only publish high-P&L trade ideas (Profit-Seeking Filter)
+        # Minimum P&L threshold: Only send if total P&L > -5% (not hemorrhaging money)
+        if self.total_pnl < -5.0 and self.trade_count > 5:
+            logging.warning(
+                f"[{self.name}] Trade idea SUPPRESSED: Total P&L={self.total_pnl:.2f}% is too negative "
+                f"(Win Rate: {self.win_rate:.1f}%)"
+            )
+            return  # Don't publish losing strategies
+
+        # Create trade idea message for the Alpha Tournament
+        trade_idea = {
             "source": self.name,
             "pair": self.pair,
             "order_type": "market",
             "direction": direction,
             "amount": 0.001,
-            # BIG ROCK 28: Include scores for Trader filtering
+            # BIG ROCK 41: Alpha Tournament Metrics
             "prediction_score": self.prediction_score,
             "interestingness_score": interestingness_score,
+            "simulated_pnl": simulated_pnl,  # NEW: This trade's expected P&L
+            "total_pnl": self.total_pnl,  # NEW: Agent's cumulative P&L
+            "win_rate": self.win_rate,  # NEW: Win percentage
+            "trade_count": self.trade_count,  # NEW: Number of trades executed
             "current_price": current_close,
             "agent_generation": self.generation,
             "product_focus": self.product_focus
         }
 
-        logging.info(f"[{self.name}] Sending {direction} order with Interestingness={interestingness_score:.1f}, Prediction={self.prediction_score:.2f}")
-        self.publish(self.order_channel, order_message)
+        logging.info(
+            f"[{self.name}] Publishing trade idea: {direction} | "
+            f"Interestingness={interestingness_score:.1f} | "
+            f"Simulated P&L={simulated_pnl:.2f}% | "
+            f"Total P&L={self.total_pnl:.2f}% | "
+            f"Win Rate={self.win_rate:.1f}%"
+        )
+
+        # BIG ROCK 41 (Corrected): Publish to 'mycelial-trade-ideas' channel
+        # The TradingAgent will look for Signal Collisions with baseline-trade-ideas
+        self.publish("mycelial-trade-ideas", trade_idea)
 
     def simulate_peer_review(self):
         """

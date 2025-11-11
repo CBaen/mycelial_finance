@@ -1,5 +1,5 @@
-# dashboard.py - MYCELIAL INTELLIGENCE v11.0: BIG ROCK 26 - Intelligent Storytelling Fix
-# Mission: Dynamic agent discovery, intelligent pattern analysis, rich storytelling
+# dashboard.py - MYCELIAL INTELLIGENCE v12.0: BIG ROCK 41 (Corrected) - The Trifecta P&L Engine
+# Mission: Signal Collision Detection, Three P&L Streams, Synthesis Gateway Visualization
 
 import dash
 from dash import dcc, html, Input, Output, State
@@ -387,6 +387,178 @@ class PatternDiscoveryEngine:
 # Initialize pattern discovery engine
 pattern_engine = PatternDiscoveryEngine()
 
+# === HELPER FUNCTIONS FROM DASHBOARD_V2 (Human-Readable Intelligence) ===
+
+def translate_crypto_symbol(symbol_or_pair):
+    """Convert Kraken symbols to human names"""
+    mapping = {
+        'XXBTZUSD': 'Bitcoin',
+        'XETHZUSD': 'Ethereum',
+        'BTC': 'Bitcoin',
+        'ETH': 'Ethereum'
+    }
+    for key, value in mapping.items():
+        if key in str(symbol_or_pair):
+            return value
+    return symbol_or_pair
+
+def explain_pattern_plain_english(pattern_data):
+    """Convert technical pattern data to plain English explanation"""
+    raw_features = pattern_data.get('raw_features', {})
+    close_price = raw_features.get('close', 0)
+
+    # Detect crypto from agent_id
+    agent_id = str(pattern_data.get('agent_id', ''))
+    crypto_name = "Unknown Asset"
+
+    if 'XXBTZUSD' in agent_id or 'DataEngineer_1' in agent_id:
+        crypto_name = "Bitcoin"
+    elif 'XETHZUSD' in agent_id or 'DataEngineer_2' in agent_id:
+        crypto_name = "Ethereum"
+
+    # Build plain English explanation
+    explanation = f"{crypto_name} "
+
+    if close_price > 100000:  # Bitcoin range
+        explanation += f"is currently at ${close_price:,.0f}. "
+    elif close_price > 1000:  # Ethereum range
+        explanation += f"is currently at ${close_price:,.2f}. "
+
+    # Add pattern insight
+    pattern_value = pattern_data.get('pattern_value', 0)
+    if pattern_value >= 75:
+        explanation += "This is a VERY STRONG pattern showing high confidence in continued movement. "
+    elif pattern_value >= 60:
+        explanation += "This is a STRONG pattern with good reliability. "
+    elif pattern_value >= 40:
+        explanation += "This is a MODERATE pattern worth monitoring. "
+
+    return explanation
+
+def synthesize_cross_moat_intelligence(sql_patterns):
+    """
+    Cross-Moat Synthesis: Detects when multiple moats align.
+    Returns plain English intelligence briefing.
+    """
+    # Categorize patterns by moat
+    govt_patterns = [p for p in sql_patterns if 'GovtDataMiner' in str(p.get('agent_id', ''))]
+    logistics_patterns = [p for p in sql_patterns if 'LogisticsMiner' in str(p.get('agent_id', ''))]
+    corp_patterns = [p for p in sql_patterns if 'CorpDataMiner' in str(p.get('agent_id', ''))]
+    code_patterns = [p for p in sql_patterns if 'RepoScraper' in str(p.get('agent_id', ''))]
+    finance_patterns = [p for p in sql_patterns if 'DataEngineer' in str(p.get('agent_id', ''))]
+
+    # Calculate moat strength
+    def get_moat_strength(patterns):
+        if not patterns:
+            return 'None', 0
+        recent = patterns[:5]
+        avg_value = sum(p['pattern_value'] for p in recent) / len(recent)
+        if avg_value >= 70:
+            return 'Strong', avg_value
+        elif avg_value >= 55:
+            return 'Moderate', avg_value
+        elif avg_value >= 40:
+            return 'Weak', avg_value
+        else:
+            return 'None', avg_value
+
+    # Get strength for each moat
+    govt_strength, govt_value = get_moat_strength(govt_patterns)
+    logistics_strength, logistics_value = get_moat_strength(logistics_patterns)
+    corp_strength, corp_value = get_moat_strength(corp_patterns)
+    code_strength, code_value = get_moat_strength(code_patterns)
+    finance_strength, finance_value = get_moat_strength(finance_patterns)
+
+    # Count strong moats
+    strong_moats = []
+    if govt_strength in ['Strong', 'Moderate']:
+        strong_moats.append('Government Policy')
+    if logistics_strength in ['Strong', 'Moderate']:
+        strong_moats.append('Supply Chain')
+    if corp_strength in ['Strong', 'Moderate']:
+        strong_moats.append('Tech Corporations')
+    if code_strength in ['Strong', 'Moderate']:
+        strong_moats.append('Code Innovation')
+    if finance_strength in ['Strong', 'Moderate']:
+        strong_moats.append('Crypto Markets')
+
+    # Generate synthesis report
+    synthesis = {
+        'alignment_count': len(strong_moats),
+        'aligned_moats': strong_moats,
+        'signal_strength': 'NONE',
+        'briefing': '',
+        'recommendation': '',
+        'moat_details': {
+            'Government': {'strength': govt_strength, 'value': govt_value},
+            'Logistics': {'strength': logistics_strength, 'value': logistics_value},
+            'Corporations': {'strength': corp_strength, 'value': corp_value},
+            'Code': {'strength': code_strength, 'value': code_value},
+            'Finance': {'strength': finance_strength, 'value': finance_value}
+        }
+    }
+
+    # Determine overall signal
+    if len(strong_moats) >= 4:
+        synthesis['signal_strength'] = 'VERY STRONG'
+        synthesis['briefing'] = f"MAJOR ALIGNMENT DETECTED: {len(strong_moats)} out of 5 moats are showing strong patterns simultaneously. This is extremely rare and indicates a high-confidence market environment."
+        synthesis['recommendation'] = "When 4+ moats align, it historically signals a major trend. This is the highest confidence signal the system can produce."
+
+    elif len(strong_moats) == 3:
+        synthesis['signal_strength'] = 'STRONG'
+        moat_list = ', '.join(strong_moats)
+        synthesis['briefing'] = f"STRONG ALIGNMENT: {moat_list} are all showing coordinated patterns. Three-way alignment suggests a developing trend."
+        synthesis['recommendation'] = "Three moats agreeing is a strong signal. Watch for the 4th moat to confirm."
+
+    elif len(strong_moats) == 2:
+        synthesis['signal_strength'] = 'MODERATE'
+        moat_list = ', '.join(strong_moats)
+        synthesis['briefing'] = f"MODERATE SIGNAL: {moat_list} are showing aligned patterns. Two-moat alignment is worth monitoring."
+        synthesis['recommendation'] = "Two moats agreeing is interesting but needs confirmation from other areas."
+
+    elif len(strong_moats) == 1:
+        synthesis['signal_strength'] = 'WEAK'
+        synthesis['briefing'] = f"SINGLE MOAT SIGNAL: Only {strong_moats[0]} is showing patterns."
+        synthesis['recommendation'] = "Wait for at least 2 moats to align before taking action."
+
+    else:
+        synthesis['signal_strength'] = 'NONE'
+        synthesis['briefing'] = "NO CLEAR SIGNAL: None of the 5 moats are showing strong patterns. Market is in consolidation."
+        synthesis['recommendation'] = "When moats don't align, the best strategy is patience."
+
+    return synthesis
+
+def get_sql_patterns():
+    """Query SQL database for archived patterns"""
+    import sqlite3
+    try:
+        conn = sqlite3.connect('mycelial_patterns.db')
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT agent_id, timestamp, pattern_value, raw_features, age_minutes, decay_factor
+            FROM patterns
+            ORDER BY timestamp DESC
+            LIMIT 100
+        """)
+
+        patterns = []
+        for row in cursor.fetchall():
+            patterns.append({
+                'agent_id': row[0],
+                'timestamp': row[1],
+                'pattern_value': row[2],
+                'raw_features': json.loads(row[3]) if row[3] else {},
+                'age_minutes': row[4],
+                'decay_factor': row[5]
+            })
+
+        conn.close()
+        return patterns
+    except Exception as e:
+        logging.debug(f"SQL query info: {e}")
+        return []
+
 # === DASH APP ===
 app = dash.Dash(
     __name__,
@@ -397,7 +569,7 @@ app = dash.Dash(
     ],
     suppress_callback_exceptions=True,
 )
-app.title = "Mycelial Intelligence - v11.0 Intelligent Storytelling"
+app.title = "Mycelial Intelligence - v12.0 Trifecta P&L Engine"
 
 # === LAYOUT ===
 app.layout = dbc.Container(
@@ -424,6 +596,17 @@ app.layout = dbc.Container(
         dcc.Store(id='agent-carousel-index', data=0),
         dcc.Store(id='collaboration-store', data={}),  # NEW: Agent collaboration tracking
         dcc.Store(id='pattern-evolution-store', data=[]),  # NEW: Pattern lineage
+        # BIG ROCK 41 (Corrected): Trifecta P&L Stores
+        dcc.Store(id='trifecta-pnl-store', data={
+            'times': [],
+            'baseline_pnl': [0],
+            'mycelial_pnl': [0],
+            'synthesized_pnl': [0],
+            'baseline_trades': 0,
+            'mycelial_trades': 0,
+            'synthesized_trades': 0
+        }),
+        dcc.Store(id='trade-ledger-store', data=[]),  # Live trade ledger
 
         dcc.Interval(id='interval', interval=2000, n_intervals=0),
 
@@ -433,8 +616,10 @@ app.layout = dbc.Container(
                 html.I(className="fas fa-brain", style={'marginRight': '15px', 'color': COLORS['primary']}),
                 "MYCELIAL INTELLIGENCE ENGINE"
             ], style={'fontSize': '2.5rem', 'fontWeight': '700', 'color': COLORS['text'], 'textAlign': 'center'}),
-            html.P("v11.0: Big Rock 26 - Intelligent Storytelling & Pattern Discovery",
+            html.P("v12.0: Trifecta P&L Engine + Cross-Moat Intelligence + Human-Readable Insights",
                   style={'color': COLORS['text_muted'], 'fontSize': '0.95rem', 'textAlign': 'center'}),
+            html.P("Real-time insights across Finance, Government, Logistics, Corporations, and Code Innovation",
+                  style={'color': COLORS['text_muted'], 'fontSize': '0.875rem', 'textAlign': 'center'}),
         ], className="py-3 mb-4"))),
 
         # === KEY METRICS ROW ===
@@ -510,7 +695,11 @@ app.layout = dbc.Container(
         ], className='mb-4'),
 
         # === TABS ===
-        dbc.Tabs(id="tabs", active_tab="tab-pattern-discovery", className="mb-4", children=[
+        dbc.Tabs(id="tabs", active_tab="tab-executive-summary", className="mb-4", children=[
+            dbc.Tab(label="📊 Executive Summary", tab_id="tab-executive-summary",
+                   label_style={'color': COLORS['text_muted']}, active_label_style={'color': COLORS['success'], 'fontWeight': '600'}),
+            dbc.Tab(label="💰 Trifecta P&L", tab_id="tab-trifecta-pnl",
+                   label_style={'color': COLORS['text_muted']}, active_label_style={'color': '#fbbf24', 'fontWeight': '600'}),
             dbc.Tab(label="🔍 Pattern Discovery", tab_id="tab-pattern-discovery",
                    label_style={'color': COLORS['text_muted']}, active_label_style={'color': COLORS['primary'], 'fontWeight': '600'}),
             dbc.Tab(label="🧠 Agent Activity", tab_id="tab-agent-activity",
@@ -524,7 +713,7 @@ app.layout = dbc.Container(
         ]),
         html.Div(id="tab-content"),
 
-        html.Div(f"Session {SESSION_ID} | Big Rock 26: Intelligent Storytelling | Dynamic Agent Discovery",
+        html.Div(f"Session {SESSION_ID} | Big Rock 41 (Corrected): The Trifecta P&L Engine | Synthesis Gateway",
                 className="text-center mt-4", style={'color': COLORS['text_muted'], 'fontSize': '0.75rem'})
     ]
 )
@@ -555,7 +744,11 @@ def start_redis_listener(app_queue: Queue):
         'pattern-discovery:*': 'intelligent-pattern',  # For intelligent pattern messages
         'pattern-narrative': 'pattern-narrative',  # BIG ROCK 39: Deep Research Agent narratives
         'ta-signals': 'ta-signals',  # BIG ROCK 39: Technical Analysis signals
-        'market-exploration': 'market-exploration'  # BIG ROCK 39: Market Explorer discoveries
+        'market-exploration': 'market-exploration',  # BIG ROCK 39: Market Explorer discoveries
+        # BIG ROCK 41 (Corrected): The Trifecta P&L Engine
+        'mycelial-trade-ideas': 'mycelial-trade-ideas',  # Swarm causal patterns
+        'baseline-trade-ideas': 'baseline-trade-ideas',  # Technical Analysis baseline
+        'synthesized-trade-log': 'synthesized-trade-log'  # Signal Collision trades
     }
 
     def create_listener(pattern, msg_type):
@@ -582,7 +775,7 @@ def start_redis_listener(app_queue: Queue):
 
 listener_thread = threading.Thread(target=start_redis_listener, args=(message_queue,), daemon=True)
 listener_thread.start()
-logging.info("Mycelial Intelligent Engine v11.0 Active")
+logging.info("Mycelial Trifecta P&L Engine v12.0 Active - BIG ROCK 41 (Corrected)")
 
 # === MAIN DATA UPDATE WITH INTELLIGENT PATTERN DISCOVERY ===
 @app.callback(
@@ -596,7 +789,9 @@ logging.info("Mycelial Intelligent Engine v11.0 Active")
      Output('moat-stats-store', 'data'),
      Output('haven-risk-store', 'data'),
      Output('collaboration-store', 'data'),
-     Output('pattern-evolution-store', 'data')],
+     Output('pattern-evolution-store', 'data'),
+     Output('trifecta-pnl-store', 'data'),
+     Output('trade-ledger-store', 'data')],
     [Input('interval', 'n_intervals')],
     [State('pattern-store', 'data'),
      State('moat-health-store', 'data'),
@@ -608,11 +803,14 @@ logging.info("Mycelial Intelligent Engine v11.0 Active")
      State('moat-stats-store', 'data'),
      State('haven-risk-store', 'data'),
      State('collaboration-store', 'data'),
-     State('pattern-evolution-store', 'data')]
+     State('pattern-evolution-store', 'data'),
+     State('trifecta-pnl-store', 'data'),
+     State('trade-ledger-store', 'data')]
 )
 def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_health, discoveries,
-                pattern_details, moat_stats, haven_risk, collaboration_data, pattern_evolution):
-    """Process Redis messages with INTELLIGENT pattern discovery."""
+                pattern_details, moat_stats, haven_risk, collaboration_data, pattern_evolution,
+                trifecta_pnl, trade_ledger):
+    """Process Redis messages with INTELLIGENT pattern discovery and Trifecta P&L tracking."""
 
     # Process all queued messages
     while not message_queue.empty():
@@ -831,6 +1029,73 @@ def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_h
             if len(haven_risk['history']) > 50:
                 haven_risk['history'] = haven_risk['history'][-50:]
 
+        # === BIG ROCK 41 (Corrected): TRIFECTA P&L MESSAGE HANDLERS ===
+        elif msg_type == 'mycelial-trade-ideas':
+            # Mycelial Swarm pattern trade ideas (tracked separately)
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'💜 Mycelial: {data.get("direction", "N/A").upper()} {data.get("pair", "N/A")}',
+                'color': COLORS['primary']
+            })
+            trifecta_pnl['mycelial_trades'] += 1
+
+        elif msg_type == 'baseline-trade-ideas':
+            # Baseline TA signals (tracked separately)
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'⚪ Baseline TA: {data.get("direction", "N/A").upper()} {data.get("pair", "N/A")}',
+                'color': COLORS['text_muted']
+            })
+            trifecta_pnl['baseline_trades'] += 1
+
+        elif msg_type == 'synthesized-trade-log':
+            # ✓✓✓ SIGNAL COLLISION - THE GOLD STANDARD ✓✓✓
+            # This is where both Mycelial and Baseline AGREE
+            baseline_pnl = data.get('baseline_pnl', 0.0)
+            mycelial_pnl = data.get('mycelial_pnl', 0.0)
+            synthesized_pnl = data.get('synthesized_pnl', 0.0)
+
+            # Update P&L arrays
+            trifecta_pnl['baseline_pnl'].append(baseline_pnl)
+            trifecta_pnl['mycelial_pnl'].append(mycelial_pnl)
+            trifecta_pnl['synthesized_pnl'].append(synthesized_pnl)
+            trifecta_pnl['times'].append(timestamp)
+
+            # Update trade counts
+            trifecta_pnl['baseline_trades'] = data.get('baseline_trades', trifecta_pnl['baseline_trades'])
+            trifecta_pnl['mycelial_trades'] = data.get('mycelial_trades', trifecta_pnl['mycelial_trades'])
+            trifecta_pnl['synthesized_trades'] = data.get('synthesized_trades', trifecta_pnl['synthesized_trades'])
+
+            # Limit history
+            if len(trifecta_pnl['times']) > 100:
+                trifecta_pnl['times'] = trifecta_pnl['times'][-100:]
+                trifecta_pnl['baseline_pnl'] = trifecta_pnl['baseline_pnl'][-100:]
+                trifecta_pnl['mycelial_pnl'] = trifecta_pnl['mycelial_pnl'][-100:]
+                trifecta_pnl['synthesized_pnl'] = trifecta_pnl['synthesized_pnl'][-100:]
+
+            # Add to trade ledger
+            trade_ledger.append({
+                'time': timestamp,
+                'signal_type': 'SYNTHESIZED',
+                'pair': data.get('pair', 'N/A'),
+                'direction': data.get('direction', 'N/A'),
+                'price': data.get('current_price', 0),
+                'baseline_pnl': baseline_pnl,
+                'mycelial_pnl': mycelial_pnl,
+                'synthesized_pnl': synthesized_pnl,
+                'execution_result': data.get('execution_result', {})
+            })
+
+            # Activity log with GOLD color for collisions
+            activity_log.append({
+                'time': timestamp,
+                'agent': source,
+                'action': f'✓✓✓ SIGNAL COLLISION: {data.get("direction", "N/A").upper()} {data.get("pair", "N/A")} | P&L: {synthesized_pnl:.2f}%',
+                'color': '#fbbf24'  # GOLD
+            })
+
         # Track pattern discoveries over time
         pattern_data['times'].append(timestamp)
         pattern_data['counts'].append(pattern_data['total_patterns'])
@@ -858,7 +1123,11 @@ def update_data(n, pattern_data, moat_health, activity_log, agent_stats, swarm_h
         if collaborators:
             collaboration_data[agent_id] = collaborators
 
-    return pattern_data, moat_health, activity_log, agent_stats, swarm_health, discoveries, pattern_details, moat_stats, haven_risk, collaboration_data, pattern_evolution
+    # Limit trade ledger size
+    if len(trade_ledger) > 200:
+        trade_ledger = trade_ledger[-200:]
+
+    return pattern_data, moat_health, activity_log, agent_stats, swarm_health, discoveries, pattern_details, moat_stats, haven_risk, collaboration_data, pattern_evolution, trifecta_pnl, trade_ledger
 
 # === KEY METRICS UPDATES ===
 @app.callback(
@@ -916,11 +1185,239 @@ def update_key_metrics(pattern_data, swarm_health, haven_risk, agent_stats):
 # === TAB RENDERER WITH ENHANCED STORYTELLING ===
 @app.callback(
     Output('tab-content', 'children'),
-    [Input('tabs', 'active_tab')]
+    [Input('tabs', 'active_tab'),
+     Input('interval', 'n_intervals')]
 )
-def render_tab_content(active_tab):
+def render_tab_content(active_tab, n):
+    # Get SQL patterns and synthesis for macro views
+    sql_patterns = get_sql_patterns()
+    synthesis = synthesize_cross_moat_intelligence(sql_patterns)
 
-    if active_tab == 'tab-pattern-discovery':
+    if active_tab == 'tab-executive-summary':
+        # MACRO VIEW: Cross-Moat Intelligence Summary
+        return dbc.Container(fluid=True, children=[
+            # Cross-Moat Synthesis Card
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("What's Happening Right Now", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            html.P(f"Last updated: {datetime.now().strftime('%H:%M:%S')}",
+                                  style={'color': COLORS['text_muted'], 'fontSize': '0.875rem', 'marginBottom': '20px'}),
+
+                            # Signal Strength Badge
+                            html.Div([
+                                html.Span(
+                                    synthesis['signal_strength'] + " SIGNAL",
+                                    style={
+                                        'backgroundColor': COLORS['danger'] if synthesis['alignment_count'] >= 4
+                                                         else COLORS['warning'] if synthesis['alignment_count'] == 3
+                                                         else COLORS['info'] if synthesis['alignment_count'] == 2
+                                                         else COLORS['text_muted'],
+                                        'color': 'white',
+                                        'padding': '8px 20px',
+                                        'borderRadius': '20px',
+                                        'fontSize': '0.875rem',
+                                        'fontWeight': '700',
+                                        'textTransform': 'uppercase'
+                                    }
+                                )
+                            ], style={'marginBottom': '24px'}),
+
+                            # Friend-to-friend briefing
+                            html.P(synthesis['briefing'],
+                                  style={'fontSize': '1.125rem', 'lineHeight': '1.75', 'color': COLORS['text'], 'marginBottom': '24px'}),
+
+                            html.P(synthesis['recommendation'],
+                                  style={'fontSize': '1rem', 'lineHeight': '1.75', 'color': COLORS['text_muted']}),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ]),
+
+            # 5 Moat Status Grid
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("5-Pillar Moat Intelligence", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            dbc.Row([
+                                # Government
+                                dbc.Col([
+                                    html.Div([
+                                        html.H6("GOVERNMENT", style={'color': COLORS['text_muted'], 'fontSize': '0.75rem', 'marginBottom': '8px'}),
+                                        html.H4(synthesis['moat_details']['Government']['strength'],
+                                               style={'color': COLORS['success'] if synthesis['moat_details']['Government']['strength'] == 'Strong'
+                                                     else COLORS['warning'] if synthesis['moat_details']['Government']['strength'] == 'Moderate'
+                                                     else COLORS['text_muted'], 'fontWeight': '600'}),
+                                        html.P(f"{synthesis['moat_details']['Government']['value']:.0f}% confidence",
+                                              style={'color': COLORS['text_muted'], 'fontSize': '0.75rem'})
+                                    ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': COLORS['background'], 'borderRadius': '12px'})
+                                ], width=2),
+                                # Logistics
+                                dbc.Col([
+                                    html.Div([
+                                        html.H6("LOGISTICS", style={'color': COLORS['text_muted'], 'fontSize': '0.75rem', 'marginBottom': '8px'}),
+                                        html.H4(synthesis['moat_details']['Logistics']['strength'],
+                                               style={'color': COLORS['success'] if synthesis['moat_details']['Logistics']['strength'] == 'Strong'
+                                                     else COLORS['warning'] if synthesis['moat_details']['Logistics']['strength'] == 'Moderate'
+                                                     else COLORS['text_muted'], 'fontWeight': '600'}),
+                                        html.P(f"{synthesis['moat_details']['Logistics']['value']:.0f}% confidence",
+                                              style={'color': COLORS['text_muted'], 'fontSize': '0.75rem'})
+                                    ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': COLORS['background'], 'borderRadius': '12px'})
+                                ], width=2),
+                                # Corporations
+                                dbc.Col([
+                                    html.Div([
+                                        html.H6("CORPORATIONS", style={'color': COLORS['text_muted'], 'fontSize': '0.75rem', 'marginBottom': '8px'}),
+                                        html.H4(synthesis['moat_details']['Corporations']['strength'],
+                                               style={'color': COLORS['success'] if synthesis['moat_details']['Corporations']['strength'] == 'Strong'
+                                                     else COLORS['warning'] if synthesis['moat_details']['Corporations']['strength'] == 'Moderate'
+                                                     else COLORS['text_muted'], 'fontWeight': '600'}),
+                                        html.P(f"{synthesis['moat_details']['Corporations']['value']:.0f}% confidence",
+                                              style={'color': COLORS['text_muted'], 'fontSize': '0.75rem'})
+                                    ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': COLORS['background'], 'borderRadius': '12px'})
+                                ], width=2),
+                                # Code
+                                dbc.Col([
+                                    html.Div([
+                                        html.H6("CODE", style={'color': COLORS['text_muted'], 'fontSize': '0.75rem', 'marginBottom': '8px'}),
+                                        html.H4(synthesis['moat_details']['Code']['strength'],
+                                               style={'color': COLORS['success'] if synthesis['moat_details']['Code']['strength'] == 'Strong'
+                                                     else COLORS['warning'] if synthesis['moat_details']['Code']['strength'] == 'Moderate'
+                                                     else COLORS['text_muted'], 'fontWeight': '600'}),
+                                        html.P(f"{synthesis['moat_details']['Code']['value']:.0f}% confidence",
+                                              style={'color': COLORS['text_muted'], 'fontSize': '0.75rem'})
+                                    ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': COLORS['background'], 'borderRadius': '12px'})
+                                ], width=2),
+                                # Finance
+                                dbc.Col([
+                                    html.Div([
+                                        html.H6("FINANCE", style={'color': COLORS['text_muted'], 'fontSize': '0.75rem', 'marginBottom': '8px'}),
+                                        html.H4(synthesis['moat_details']['Finance']['strength'],
+                                               style={'color': COLORS['success'] if synthesis['moat_details']['Finance']['strength'] == 'Strong'
+                                                     else COLORS['warning'] if synthesis['moat_details']['Finance']['strength'] == 'Moderate'
+                                                     else COLORS['text_muted'], 'fontWeight': '600'}),
+                                        html.P(f"{synthesis['moat_details']['Finance']['value']:.0f}% confidence",
+                                              style={'color': COLORS['text_muted'], 'fontSize': '0.75rem'})
+                                    ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': COLORS['background'], 'borderRadius': '12px'})
+                                ], width=2),
+                                # Alignment Count
+                                dbc.Col([
+                                    html.Div([
+                                        html.H6("ALIGNED", style={'color': COLORS['text_muted'], 'fontSize': '0.75rem', 'marginBottom': '8px'}),
+                                        html.H4(f"{synthesis['alignment_count']}/5",
+                                               style={'color': '#fbbf24', 'fontWeight': '700'}),
+                                        html.P("moats strong",
+                                              style={'color': COLORS['text_muted'], 'fontSize': '0.75rem'})
+                                    ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': COLORS['background'], 'borderRadius': '12px'})
+                                ], width=2),
+                            ])
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ], className='mt-3'),
+
+            # High Priority Patterns
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("Patterns You Should Know About", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            html.P("These are the most interesting things happening right now",
+                                  style={'color': COLORS['text_muted'], 'marginBottom': '20px'}),
+                            html.Div([
+                                html.Div([
+                                    html.Span(f"{p['pattern_value']:.0f}% CONFIDENCE",
+                                             style={'backgroundColor': COLORS['warning'], 'color': 'white', 'padding': '4px 12px',
+                                                   'borderRadius': '12px', 'fontSize': '0.75rem', 'fontWeight': '700', 'marginBottom': '12px', 'display': 'inline-block'}),
+                                    html.P(explain_pattern_plain_english(p),
+                                          style={'fontSize': '1.125rem', 'lineHeight': '1.75', 'color': COLORS['text'], 'marginTop': '12px', 'marginBottom': '8px'}),
+                                    html.Small(f"Spotted at {datetime.fromtimestamp(p['timestamp']).strftime('%H:%M:%S')}",
+                                              style={'color': COLORS['text_muted']})
+                                ], style={'padding': '20px', 'backgroundColor': COLORS['background'], 'borderRadius': '12px', 'marginBottom': '16px',
+                                         'border': f"1px solid {COLORS['border']}"})
+                                for p in [p for p in sql_patterns if p['pattern_value'] >= 70][:3]
+                            ]) if any(p['pattern_value'] >= 70 for p in sql_patterns) else html.P(
+                                "Your agents are actively searching for patterns. Give them a moment!",
+                                style={'color': COLORS['text_muted'], 'fontStyle': 'italic'})
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ], className='mt-3'),
+        ])
+
+    elif active_tab == 'tab-trifecta-pnl':
+        return dbc.Container(fluid=True, children=[
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("💰 Trifecta P&L Dashboard - BIG ROCK 41 (Corrected)", style={'color': '#fbbf24'})),
+                        dbc.CardBody([
+                            html.P([
+                                "The ", html.Strong("Synthesis Gateway", style={'color': '#fbbf24'}),
+                                " executes trades ONLY when both Mycelial AI patterns and Baseline TA signals AGREE (Signal Collisions). ",
+                                "This creates the highest-conviction \"Synthesized Signal\" - our primary product."
+                            ], style={'color': COLORS['text'], 'marginBottom': '20px'}),
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Card([
+                                        dbc.CardBody([
+                                            html.H6("⚪ Baseline P&L", style={'color': COLORS['text_muted']}),
+                                            html.H3(id='baseline-pnl-metric', children="0.00%", style={'color': COLORS['text_muted'], 'fontWeight': '700'}),
+                                            html.P(id='baseline-trades-count', children="0 trades", style={'color': COLORS['text_muted'], 'fontSize': '0.9rem'}),
+                                        ])
+                                    ], style={'backgroundColor': COLORS['background']})
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Card([
+                                        dbc.CardBody([
+                                            html.H6("💜 Mycelial P&L", style={'color': COLORS['primary']}),
+                                            html.H3(id='mycelial-pnl-metric', children="0.00%", style={'color': COLORS['primary'], 'fontWeight': '700'}),
+                                            html.P(id='mycelial-trades-count', children="0 trades", style={'color': COLORS['text_muted'], 'fontSize': '0.9rem'}),
+                                        ])
+                                    ], style={'backgroundColor': COLORS['background']})
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Card([
+                                        dbc.CardBody([
+                                            html.H6("✓ Synthesized P&L (GOLD)", style={'color': '#fbbf24'}),
+                                            html.H3(id='synthesized-pnl-metric', children="0.00%", style={'color': '#fbbf24', 'fontWeight': '700'}),
+                                            html.P(id='synthesized-trades-count', children="0 collisions", style={'color': COLORS['text_muted'], 'fontSize': '0.9rem'}),
+                                        ])
+                                    ], style={'backgroundColor': COLORS['background']})
+                                ], width=4),
+                            ])
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("📈 Trifecta P&L Over Time", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            dcc.Graph(id='trifecta-pnl-chart'),
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ], className='mt-3'),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader(html.H5("📋 Live Trade Ledger (Signal Collisions)", style={'color': COLORS['text']})),
+                        dbc.CardBody([
+                            html.Div(id='trade-ledger', style={
+                                'maxHeight': '400px',
+                                'overflowY': 'scroll'
+                            })
+                        ])
+                    ], style={'backgroundColor': COLORS['card']})
+                ], width=12),
+            ], className='mt-3'),
+        ])
+
+    elif active_tab == 'tab-pattern-discovery':
         return dbc.Container(fluid=True, children=[
             dbc.Row([
                 dbc.Col([
@@ -1660,6 +2157,169 @@ def update_pattern_timeline(pattern_data):
         margin=dict(l=40, r=20, t=60, b=40),
     )
     return fig
+
+# === BIG ROCK 41 (Corrected): TRIFECTA P&L CALLBACKS ===
+@app.callback(
+    [Output('baseline-pnl-metric', 'children'),
+     Output('baseline-trades-count', 'children'),
+     Output('mycelial-pnl-metric', 'children'),
+     Output('mycelial-trades-count', 'children'),
+     Output('synthesized-pnl-metric', 'children'),
+     Output('synthesized-trades-count', 'children')],
+    [Input('trifecta-pnl-store', 'data')]
+)
+def update_trifecta_metrics(trifecta_pnl):
+    """Update the three P&L metric cards."""
+    baseline_pnl = trifecta_pnl['baseline_pnl'][-1] if trifecta_pnl['baseline_pnl'] else 0
+    mycelial_pnl = trifecta_pnl['mycelial_pnl'][-1] if trifecta_pnl['mycelial_pnl'] else 0
+    synthesized_pnl = trifecta_pnl['synthesized_pnl'][-1] if trifecta_pnl['synthesized_pnl'] else 0
+
+    baseline_trades = trifecta_pnl.get('baseline_trades', 0)
+    mycelial_trades = trifecta_pnl.get('mycelial_trades', 0)
+    synthesized_trades = trifecta_pnl.get('synthesized_trades', 0)
+
+    return (
+        f"{baseline_pnl:+.2f}%",
+        f"{baseline_trades} trades",
+        f"{mycelial_pnl:+.2f}%",
+        f"{mycelial_trades} trades",
+        f"{synthesized_pnl:+.2f}%",
+        f"{synthesized_trades} collisions"
+    )
+
+@app.callback(
+    Output('trifecta-pnl-chart', 'figure'),
+    [Input('trifecta-pnl-store', 'data')]
+)
+def update_trifecta_chart(trifecta_pnl):
+    """Create the Trifecta P&L chart with three lines."""
+    times = trifecta_pnl.get('times', [])
+    baseline_pnl = trifecta_pnl.get('baseline_pnl', [0])
+    mycelial_pnl = trifecta_pnl.get('mycelial_pnl', [0])
+    synthesized_pnl = trifecta_pnl.get('synthesized_pnl', [0])
+
+    fig = go.Figure()
+
+    # Baseline (Gray)
+    fig.add_trace(go.Scatter(
+        x=list(range(len(baseline_pnl))),
+        y=baseline_pnl,
+        mode='lines+markers',
+        name='Baseline TA',
+        line=dict(color='#9ca3af', width=2),
+        marker=dict(size=6, color='#9ca3af'),
+    ))
+
+    # Mycelial (Purple)
+    fig.add_trace(go.Scatter(
+        x=list(range(len(mycelial_pnl))),
+        y=mycelial_pnl,
+        mode='lines+markers',
+        name='Mycelial AI',
+        line=dict(color=COLORS['primary'], width=2),
+        marker=dict(size=6, color=COLORS['primary']),
+    ))
+
+    # Synthesized (Gold) - THE PRIMARY PRODUCT
+    fig.add_trace(go.Scatter(
+        x=list(range(len(synthesized_pnl))),
+        y=synthesized_pnl,
+        mode='lines+markers',
+        name='Synthesized (Signal Collisions)',
+        line=dict(color='#fbbf24', width=4),
+        marker=dict(size=10, color='#fbbf24', symbol='star'),
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text="Trifecta P&L: Baseline vs Mycelial vs Synthesized (Primary Product)",
+            font=dict(color=COLORS['text'], size=16)
+        ),
+        plot_bgcolor=COLORS['card'],
+        paper_bgcolor=COLORS['card'],
+        font=dict(color=COLORS['text_muted']),
+        xaxis=dict(title='Data Points', gridcolor=COLORS['border']),
+        yaxis=dict(title='Cumulative P&L (%)', gridcolor=COLORS['border']),
+        margin=dict(l=40, r=20, t=60, b=40),
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='right',
+            x=1
+        ),
+        hovermode='x unified'
+    )
+    return fig
+
+@app.callback(
+    Output('trade-ledger', 'children'),
+    [Input('trade-ledger-store', 'data')]
+)
+def update_trade_ledger(trade_ledger):
+    """Display the live trade ledger for Signal Collisions."""
+    if not trade_ledger:
+        return html.P("No signal collisions yet... Waiting for Mycelial and Baseline to AGREE.",
+                     style={'color': COLORS['text_muted'], 'textAlign': 'center', 'padding': '20px'})
+
+    ledger_items = []
+    for trade in reversed(trade_ledger[-50:]):  # Show last 50
+        direction_color = COLORS['success'] if trade['direction'] == 'buy' else COLORS['danger']
+        pnl_color = COLORS['success'] if trade['synthesized_pnl'] > 0 else COLORS['danger']
+
+        ledger_items.append(dbc.Card([
+            dbc.CardBody([
+                dbc.Row([
+                    dbc.Col([
+                        html.Span("✓✓✓ COLLISION", style={
+                            'backgroundColor': '#fbbf24',
+                            'color': 'black',
+                            'padding': '4px 12px',
+                            'borderRadius': '12px',
+                            'fontSize': '0.75rem',
+                            'fontWeight': '700',
+                            'marginRight': '10px'
+                        }),
+                        html.Span(trade['direction'].upper(), style={
+                            'color': direction_color,
+                            'fontWeight': '600',
+                            'marginRight': '10px'
+                        }),
+                        html.Span(trade['pair'], style={'color': COLORS['text'], 'fontWeight': '500'}),
+                    ], width=6),
+                    dbc.Col([
+                        html.Div([
+                            html.Small(f"{trade['time']}", style={'color': COLORS['text_muted']})
+                        ], style={'textAlign': 'right'})
+                    ], width=6),
+                ]),
+                html.Hr(style={'borderColor': COLORS['border'], 'margin': '10px 0'}),
+                dbc.Row([
+                    dbc.Col([
+                        html.P([
+                            html.Small("Price: ", style={'color': COLORS['text_muted']}),
+                            html.Span(f"${trade['price']:.2f}", style={'color': COLORS['text']})
+                        ], style={'marginBottom': '5px'}),
+                        html.P([
+                            html.Small("Baseline P&L: ", style={'color': COLORS['text_muted']}),
+                            html.Span(f"{trade['baseline_pnl']:+.2f}%", style={'color': COLORS['text']})
+                        ], style={'marginBottom': '5px'}),
+                    ], width=6),
+                    dbc.Col([
+                        html.P([
+                            html.Small("Mycelial P&L: ", style={'color': COLORS['primary']}),
+                            html.Span(f"{trade['mycelial_pnl']:+.2f}%", style={'color': COLORS['primary']})
+                        ], style={'marginBottom': '5px'}),
+                        html.P([
+                            html.Small("Synthesized P&L: ", style={'color': '#fbbf24', 'fontWeight': '700'}),
+                            html.Span(f"{trade['synthesized_pnl']:+.2f}%", style={'color': pnl_color, 'fontWeight': '700', 'fontSize': '1.1rem'})
+                        ], style={'marginBottom': '0'}),
+                    ], width=6),
+                ]),
+            ])
+        ], style={'backgroundColor': COLORS['background'], 'marginBottom': '10px', 'borderLeft': f'4px solid #fbbf24'}))
+
+    return ledger_items
 
 if __name__ == '__main__':
     try:
