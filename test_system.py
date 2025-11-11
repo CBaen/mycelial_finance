@@ -41,7 +41,7 @@ if __name__ == "__main__":
     # 5. US Corporations
 
     # --- CORE LOGIC UPDATE: Enable HAVEN and Adversarial Mode ---
-    # BIG ROCK 29: Adversarial mode controlled by dry_run_mode flag
+    # BIG ROCK 39: Final 123-Agent Architecture with TA and Market Explorer layers
     model = MycelialModel(
         pairs_to_trade=['XXBTZUSD', 'XETHZUSD'],
         target_repos=['Python'],
@@ -52,14 +52,18 @@ if __name__ == "__main__":
         num_risk_managers=1,
         num_swarm_agents=100,
 
-        # NEW HAVEN AND RISK PARAMETERS:
+        # HAVEN AND RISK PARAMETERS:
         risk_governance_enabled=True,           # Activates the HAVEN coordination layer
         max_drawdown_percent=0.05,              # Global risk constraint (max 5% drawdown)
         policy_contagion_threshold=0.80,        # BIG ROCK 30: Lowered to 0.80 for safety buffer
         adversarial_test_mode=not dry_run_mode, # BIG ROCK 29: Disable toxic agents in dry-run mode
 
         # Regulatory Compliance
-        regulatory_compliance_check=True        # Explicitly check for manipulative behaviors like 'spoofing'
+        regulatory_compliance_check=True,       # Explicitly check for manipulative behaviors like 'spoofing'
+
+        # BIG ROCK 39: Technical Analysis and Market Explorer Parameters
+        num_ta_agents=3,                        # Technical Analysis competitive baseline
+        num_explorer_agents=3                   # Market exploration and discovery
     )
 
     if not model.running:

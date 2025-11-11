@@ -1,4 +1,4 @@
-# src/core/model.py - BIG ROCK 32: Final Collaborative Architecture
+# src/core/model.py - BIG ROCK 39: Final 123-Agent Architecture
 import mesa
 from src.connectors.redis_client import RedisClient
 from src.connectors.kraken_client import KrakenClient
@@ -14,6 +14,9 @@ from src.agents.corp_data_miner_agent import CorpDataMinerAgent
 # BIG ROCK 32: New Collaborative Agents
 from src.agents.mycelial_instigator_agent import MycelialInstigatorAgent
 from src.agents.deep_research_agent import DeepResearchAgent
+# BIG ROCK 39: Technical Analysis and Market Explorer Agents
+from src.agents.technical_analysis_agent import TechnicalAnalysisAgent
+from src.agents.market_explorer_agent import MarketExplorerAgent
 import logging
 import random
 import sqlite3  # BIG ROCK 31: SQL Persistence
@@ -24,12 +27,14 @@ import threading  # BIG ROCK 31: Graceful Shutdown
 class MycelialModel(mesa.Model):
     """
     The main Mesa model that creates, holds, and steps all agents.
-    BIG ROCK 32: Final Collaborative Architecture with Rule of 3 and Redundant Validation.
+    BIG ROCK 39: Final 123-Agent Architecture with TA and Market Explorer layers.
     - HAVEN Framework: Risk governance and policy contagion controls
     - SQL Persistence: High-value pattern archiving
     - Graceful Shutdown: Emergency stop mechanism
     - Rule of 3: Collaborative decision enforcement (Instigator Agents)
     - Redundant Validation: Pattern quality verification (Deep Research Agents)
+    - Technical Analysis: Competitive baseline validation (TA Agents)
+    - Market Exploration: Multi-market opportunity discovery (Explorer Agents)
     """
     def __init__(self,
                  pairs_to_trade: list,
@@ -48,7 +53,10 @@ class MycelialModel(mesa.Model):
                  regulatory_compliance_check: bool = False,
                  # BIG ROCK 32: Collaborative Architecture Parameters
                  num_instigators: int = 3,  # Rule of 3 Collaboration Enforcement
-                 num_research_agents: int = 3):  # Redundant Pattern Validation
+                 num_research_agents: int = 3,  # Redundant Pattern Validation
+                 # BIG ROCK 39: Technical Analysis and Market Explorer Parameters
+                 num_ta_agents: int = 3,  # Technical Analysis Competitive Baseline
+                 num_explorer_agents: int = 3):  # Market Exploration and Discovery
         super().__init__()
         self.running = True
 
@@ -229,9 +237,20 @@ class MycelialModel(mesa.Model):
             researcher = DeepResearchAgent(self)
             self.register_agent(researcher)
 
+        # 12. BIG ROCK 39: Create TECHNICAL ANALYSIS AGENTS (Competitive Baseline)
+        for i in range(num_ta_agents):
+            ta_agent = TechnicalAnalysisAgent(self)
+            self.register_agent(ta_agent)
+
+        # 13. BIG ROCK 39: Create MARKET EXPLORER AGENTS (Market Discovery)
+        for i in range(num_explorer_agents):
+            explorer = MarketExplorerAgent(self)
+            self.register_agent(explorer)
+
         agent_count = len(self.agents)
         logging.info(f"Mycelial Swarm created. Model initialized with {agent_count} total agents, covering ALL 5 Product Pillars: Finance, Code, Logistics, Government, and Corporations.")
         logging.info(f"[BIG ROCK 32] Collaborative Architecture: {num_instigators} Instigator Agents + {num_research_agents} Deep Research Agents deployed")
+        logging.info(f"[BIG ROCK 39] Final Architecture: {num_ta_agents} Technical Analysis Agents + {num_explorer_agents} Market Explorer Agents deployed")
 
         if self.risk_governance_enabled:
             logging.info("=" * 80)

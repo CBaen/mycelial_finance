@@ -552,7 +552,10 @@ def start_redis_listener(app_queue: Queue):
         'logistics-data:*': 'logistics-data',
         'agent-lineage-update': 'lineage-update',
         'govt-data:*': 'govt-data',
-        'pattern-discovery:*': 'intelligent-pattern'  # NEW: For intelligent pattern messages
+        'pattern-discovery:*': 'intelligent-pattern',  # For intelligent pattern messages
+        'pattern-narrative': 'pattern-narrative',  # BIG ROCK 39: Deep Research Agent narratives
+        'ta-signals': 'ta-signals',  # BIG ROCK 39: Technical Analysis signals
+        'market-exploration': 'market-exploration'  # BIG ROCK 39: Market Explorer discoveries
     }
 
     def create_listener(pattern, msg_type):
