@@ -42,8 +42,39 @@ if __name__ == "__main__":
 
     # --- CORE LOGIC UPDATE: Enable HAVEN and Adversarial Mode ---
     # BIG ROCK 39: Final 123-Agent Architecture with TA and Market Explorer layers
+    # BIG ROCK 46: Expand to multiple volatile cryptocurrencies for HFT/day trading analysis
     model = MycelialModel(
-        pairs_to_trade=['XXBTZUSD', 'XETHZUSD'],
+        pairs_to_trade=[
+            # Major Liquid Pairs (High Volume)
+            'XXBTZUSD',     # Bitcoin - baseline
+            'XETHZUSD',     # Ethereum - baseline
+
+            # High Volatility Altcoins (Layer 1s)
+            'SOLUSD',       # Solana - high volatility, popular for HFT
+            'AVAXUSD',      # Avalanche - volatile L1
+            'MATICUSD',     # Polygon - frequent price swings
+            'ADAUSD',       # Cardano - volatile mid-cap
+            'DOTUSD',       # Polkadot - cross-chain L0
+
+            # DeFi Tokens (High Volatility)
+            'AAVEUSD',      # Aave - lending protocol
+            'UNIUSD',       # Uniswap - DEX token
+            'LINKUSD',      # Chainlink - oracle network
+
+            # Meme/Momentum Coins (Extreme Volatility)
+            'DOGEUSD',      # Dogecoin - meme coin volatility
+            'SHIBUSD',      # Shiba Inu - high retail interest
+
+            # AI/Gaming Tokens (Trending Volatility)
+            'RENDERUSD',    # Render - AI/GPU compute
+            'IMXUSD',       # Immutable X - gaming L2
+
+            # Mid-Cap High Movers
+            'ATOMUSD',      # Cosmos - interchain
+            'APTUSD',       # Aptos - new L1
+            'OPUSD',        # Optimism - L2 scaling
+            'ARBUSD',       # Arbitrum - L2 scaling
+        ],
         target_repos=['Python'],
         target_regions=['US-West'],
         target_govt_regions=['US-Federal'],
@@ -99,9 +130,12 @@ if __name__ == "__main__":
     if dry_run_mode:
         logging.info(f"{num_steps // 60}-minute dry-run operational test complete.")
         logging.info("BIG ROCK 29: Live Kraken data feed successfully integrated")
+        logging.info("BIG ROCK 46: Multi-crypto volatility tracking complete")
         logging.info("Dual-Threshold Decision Architecture validated")
+        logging.info(f"Analyzed {len(model.pairs_to_trade)} cryptocurrency pairs for HFT/day trading opportunities")
     else:
         logging.info(f"{num_steps // 60}-minute adversarial simulation complete.")
         logging.info("HAVEN Framework successfully prevented policy contagion during stress test")
     logging.info("Dashboard available at http://127.0.0.1:8055")
+    logging.info("Check trades.db for performance analysis by pair")
     logging.info("=" * 80)

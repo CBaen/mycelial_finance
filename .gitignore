@@ -25,3 +25,22 @@ Thumbs.db
 nul
 *.tmp
 *.log
+logs/
+
+# Databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+chroma_db/
+
+# Backup files
+*.backup
+*.bak
+*# Name clash*
+
+# OneDrive conflicts
+*conflict*
+
+# Test outputs
+test_output.log

@@ -16,8 +16,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import numpy as np
 
-from storage.chroma_client import ChromaDBClient, create_pattern_embedding
-from connectors.market_data_aggregator import MarketDataAggregator
+from src.storage.chroma_client import ChromaDBClient, create_pattern_embedding
+from src.connectors.market_data_aggregator import MarketDataAggregator
 
 
 class MemoryAgent:

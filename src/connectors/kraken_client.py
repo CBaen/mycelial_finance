@@ -4,7 +4,13 @@ from config.settings import KRAKEN_API_KEY, KRAKEN_API_SECRET
 import logging
 import threading
 import time
-from kraken.exceptions import KrakenException
+# Import specific Kraken exceptions (KrakenException doesn't exist in current API)
+from kraken.exceptions import (
+    KrakenAuthenticationError,
+    KrakenBadRequestError,
+    KrakenRateLimitExceededError,
+    KrakenServiceUnavailableError
+)
 
 class KrakenClient:
     """
@@ -53,11 +59,12 @@ class KrakenClient:
             try:
                 return operation(*args, **kwargs)
 
-            except KrakenException as e:
+            except (KrakenAuthenticationError, KrakenBadRequestError,
+                    KrakenRateLimitExceededError, KrakenServiceUnavailableError) as e:
                 error_msg = str(e).lower()
 
                 # Don't retry authentication/permission errors
-                if any(x in error_msg for x in ['permission', 'invalid key', 'invalid signature']):
+                if isinstance(e, KrakenAuthenticationError) or any(x in error_msg for x in ['permission', 'invalid key', 'invalid signature']):
                     logging.error(f"[KRAKEN] Auth error (not retrying): {e}")
                     raise
 
@@ -72,6 +79,17 @@ class KrakenClient:
                 else:
                     logging.error(f"[KRAKEN] Failed after {self.max_retries} attempts: {e}")
                     raise
+
+            except Exception as e:
+                # Catch-all for unexpected errors (graceful degradation)
+                logging.warning(f"[KRAKEN] Unexpected error: {type(e).__name__}: {e}")
+                if attempt < self.max_retries - 1:
+                    delay = self.base_delay * (2 ** attempt)
+                    logging.warning(f"Retrying in {delay}s...")
+                    time.sleep(delay)
+                else:
+                    logging.error(f"[KRAKEN] Failed after {self.max_retries} attempts with unexpected error")
+                    return None  # Graceful degradation: return None instead of crashing
 
             except (ConnectionError, TimeoutError) as e:
                 if attempt < self.max_retries - 1:

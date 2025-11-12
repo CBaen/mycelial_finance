@@ -17,6 +17,9 @@ from src.agents.deep_research_agent import DeepResearchAgent
 # BIG ROCK 39: Technical Analysis and Market Explorer Agents
 from src.agents.technical_analysis_agent import TechnicalAnalysisAgent
 from src.agents.market_explorer_agent import MarketExplorerAgent
+# BIG ROCK 45: Learning Loop Components
+from src.storage.trade_database import TradeDatabase
+from src.agents.memory_agent import MemoryAgent
 import logging
 import random
 import sqlite3  # BIG ROCK 31: SQL Persistence
@@ -148,6 +151,14 @@ class MycelialModel(mesa.Model):
             self.db_connection = None
             self.db_cursor = None
 
+        # BIG ROCK 45: Initialize Trade Database (Learning Loop)
+        try:
+            self.trade_db = TradeDatabase("./trades.db")
+            logging.info("[TRADE-DB] Trade database initialized successfully")
+        except Exception as e:
+            logging.error(f"[TRADE-DB] Failed to initialize trade database: {e}")
+            self.trade_db = None
+
         # BIG ROCK 31: Graceful Shutdown Listener (Emergency Stop)
         try:
             self.redis_client.pubsub.subscribe(**{"system-control": self._handle_system_control})
@@ -229,9 +240,9 @@ class MycelialModel(mesa.Model):
         if self.adversarial_test_mode:
             logging.warning(f"[ADVERSARIAL] {self.toxic_agent_count} toxic agents injected into swarm for stress testing")
 
-        # 7. Create Trading Agents (Hands)
+        # 7. Create Trading Agents (Hands) - BIG ROCK 45: Pass trade_db for learning loop
         for i in range(num_traders):
-            trader = TradingAgent(self)
+            trader = TradingAgent(self, trade_db=self.trade_db)
             self.register_agent(trader)
 
         # 8. Create Risk Managers (Guardians) - BIG ROCK 20: Enhanced with HAVEN parameters

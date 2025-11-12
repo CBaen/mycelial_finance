@@ -18,3 +18,13 @@ dash-bootstrap-components>=1.0.0
 # Data Analysis
 pandas>=2.0.0
 numpy>=1.20.0
+
+# Vector Database & Machine Learning
+chromadb>=0.4.0
+scikit-learn>=1.0.0
+
+# Code Moat Integration
+PyGithub>=2.0.0
+
+# Monitoring & Observability
+prometheus-client>=0.16.0

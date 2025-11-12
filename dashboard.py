@@ -440,12 +440,12 @@ def synthesize_cross_moat_intelligence(sql_patterns):
     Cross-Moat Synthesis: Detects when multiple moats align.
     Returns plain English intelligence briefing.
     """
-    # Categorize patterns by moat
-    govt_patterns = [p for p in sql_patterns if 'GovtDataMiner' in str(p.get('agent_id', ''))]
-    logistics_patterns = [p for p in sql_patterns if 'LogisticsMiner' in str(p.get('agent_id', ''))]
-    corp_patterns = [p for p in sql_patterns if 'CorpDataMiner' in str(p.get('agent_id', ''))]
-    code_patterns = [p for p in sql_patterns if 'RepoScraper' in str(p.get('agent_id', ''))]
-    finance_patterns = [p for p in sql_patterns if 'DataEngineer' in str(p.get('agent_id', ''))]
+    # BIG ROCK 48: Categorize patterns by moat field (migrated from agent_id inference)
+    govt_patterns = [p for p in sql_patterns if p.get('moat') == 'Government']
+    logistics_patterns = [p for p in sql_patterns if p.get('moat') == 'Logistics']
+    corp_patterns = [p for p in sql_patterns if p.get('moat') == 'US Corporations']
+    code_patterns = [p for p in sql_patterns if p.get('moat') == 'Code Innovation']
+    finance_patterns = [p for p in sql_patterns if p.get('moat') == 'Finance']
 
     # Calculate moat strength
     def get_moat_strength(patterns):
@@ -529,17 +529,17 @@ def synthesize_cross_moat_intelligence(sql_patterns):
     return synthesis
 
 def get_sql_patterns():
-    """Query SQL database for archived patterns"""
+    """Query SQL database for archived patterns - BIG ROCK 48: With moat categorization"""
     import sqlite3
     try:
         conn = sqlite3.connect('mycelial_patterns.db')
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT agent_id, timestamp, pattern_value, raw_features, age_minutes, decay_factor
+            SELECT agent_id, timestamp, pattern_value, raw_features, age_minutes, decay_factor, moat, product, signal_type
             FROM patterns
             ORDER BY timestamp DESC
-            LIMIT 100
+            LIMIT 500
         """)
 
         patterns = []
@@ -550,13 +550,17 @@ def get_sql_patterns():
                 'pattern_value': row[2],
                 'raw_features': json.loads(row[3]) if row[3] else {},
                 'age_minutes': row[4],
-                'decay_factor': row[5]
+                'decay_factor': row[5],
+                'moat': row[6],  # BIG ROCK 48: Moat category
+                'product': row[7],  # BIG ROCK 48: Product category
+                'signal_type': row[8]  # BIG ROCK 48: Signal type
             })
 
         conn.close()
+        logging.info(f"[SQL] Loaded {len(patterns)} patterns from database")
         return patterns
     except Exception as e:
-        logging.debug(f"SQL query info: {e}")
+        logging.error(f"[SQL] Failed to load patterns: {e}")
         return []
 
 # === DASH APP ===
@@ -608,7 +612,7 @@ app.layout = dbc.Container(
         }),
         dcc.Store(id='trade-ledger-store', data=[]),  # Live trade ledger
 
-        dcc.Interval(id='interval', interval=2000, n_intervals=0),
+        dcc.Interval(id='interval', interval=10000, n_intervals=0),  # BIG ROCK 47: Reduced from 2s to 10s to prevent eye strain
 
         # === HEADER ===
         dbc.Row(dbc.Col(html.Div([

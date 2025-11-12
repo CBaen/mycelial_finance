@@ -7,9 +7,9 @@ from datetime import datetime
 
 # BIG ROCK 45: Import learning loop components
 try:
-    from storage.trade_database import TradeDatabase
-    from storage.chroma_client import ChromaDBClient
-    from agents.memory_agent import MemoryAgent
+    from src.storage.trade_database import TradeDatabase
+    from src.storage.chroma_client import ChromaDBClient
+    from src.agents.memory_agent import MemoryAgent
     LEARNING_LOOP_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"[LEARNING-LOOP] Components not available: {e}")
@@ -36,7 +36,7 @@ class TradingAgent(MycelialAgent):
     - Mycelial P&L (if we traded every Swarm signal)
     - Synthesized P&L (when both agree - our primary product)
     """
-    def __init__(self, model):
+    def __init__(self, model, trade_db=None):
         super().__init__(model)
         self.name = f"Trader_{self.unique_id}"
 
@@ -68,13 +68,20 @@ class TradingAgent(MycelialAgent):
         self.synthesized_positions = {}
 
         # BIG ROCK 45: Initialize learning loop components
-        self.trade_db = None
+        # Use trade_db from model if provided, otherwise try to create own instance
+        self.trade_db = trade_db
         self.memory_agent = None
         self.chroma_client = None
 
         if LEARNING_LOOP_AVAILABLE:
             try:
-                self.trade_db = TradeDatabase(db_path="./trades.db")
+                # If trade_db wasn't passed from model, create our own
+                if self.trade_db is None:
+                    self.trade_db = TradeDatabase(db_path="./trades.db")
+                    logging.info(f"[{self.name}] Created own TradeDatabase instance")
+                else:
+                    logging.info(f"[{self.name}] Using shared TradeDatabase from model")
+
                 self.chroma_client = ChromaDBClient(persist_directory="./chroma_db")
                 # Create memory agent for this trading agent
                 self.memory_agent = MemoryAgent(
