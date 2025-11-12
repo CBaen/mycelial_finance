@@ -3,6 +3,11 @@ import logging
 from .base_agent import MycelialAgent
 import time
 
+# PHASE 2.1: Realistic trading costs (Kraken fees + market impact)
+TRADING_FEE_PCT = 0.26  # 0.26% per trade (Kraken maker/taker average)
+SLIPPAGE_PCT = 0.10     # 0.10% slippage (market impact)
+TOTAL_COST_PCT = (TRADING_FEE_PCT + SLIPPAGE_PCT) / 100.0  # 0.0036 (0.36% per trade)
+
 class TradingAgent(MycelialAgent):
     """
     BIG ROCK 41 (Corrected): The Synthesis Gateway - Signal Collision Detector
@@ -191,12 +196,21 @@ class TradingAgent(MycelialAgent):
             setattr(self, trades_attr, getattr(self, trades_attr) + 1)
 
         elif direction == 'sell' and pair in positions:
-            # Close position and calculate P&L
+            # Close position and calculate P&L (PHASE 2.1: with fees + slippage)
             entry_price = positions[pair]['entry_price']
-            pnl_pct = ((current_price - entry_price) / entry_price) * 100
+
+            # Calculate raw P&L
+            raw_pnl_pct = ((current_price - entry_price) / entry_price) * 100
+
+            # Apply trading costs: 0.36% per round trip (0.26% fee + 0.10% slippage)
+            # Round trip = buy + sell = 2 trades
+            total_cost_pct = TOTAL_COST_PCT * 2 * 100  # Convert to percentage
+
+            # Net P&L after costs
+            net_pnl_pct = raw_pnl_pct - total_cost_pct
 
             current_pnl = getattr(self, pnl_attr)
-            setattr(self, pnl_attr, current_pnl + pnl_pct)
+            setattr(self, pnl_attr, current_pnl + net_pnl_pct)
 
             positions.pop(pair)
 
@@ -220,8 +234,16 @@ class TradingAgent(MycelialAgent):
 
             elif direction == 'sell' and pair in self.synthesized_positions:
                 entry_price = self.synthesized_positions[pair]['entry_price']
-                pnl_pct = ((current_price - entry_price) / entry_price) * 100
-                self.synthesized_pnl += pnl_pct
+
+                # Calculate raw P&L
+                raw_pnl_pct = ((current_price - entry_price) / entry_price) * 100
+
+                # PHASE 2.1: Apply trading costs (0.36% round trip)
+                total_cost_pct = TOTAL_COST_PCT * 2 * 100
+
+                # Net P&L after costs
+                net_pnl_pct = raw_pnl_pct - total_cost_pct
+                self.synthesized_pnl += net_pnl_pct
                 self.synthesized_positions.pop(pair)
 
             # Execute via Kraken client

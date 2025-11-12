@@ -2,19 +2,26 @@
 import kraken.spot
 from config.settings import KRAKEN_API_KEY, KRAKEN_API_SECRET
 import logging
-import threading  # NEW IMPORT
+import threading
 import time
+from kraken.exceptions import KrakenException
 
 class KrakenClient:
     """
     Our system's only interface to the Kraken exchange.
-    Now includes a threading lock to prevent EAPI:Invalid nonce errors.
+    Includes threading lock to prevent EAPI:Invalid nonce errors.
+
+    PHASE 2.4: Added error recovery with exponential backoff and automatic reconnection.
     """
     def __init__(self):
         self.nonce_lock = threading.Lock()  # Nonce lock for thread safety
+        self.max_retries = 3
+        self.base_delay = 2.0  # seconds
+        self.initialized = False
+
         try:
             if not KRAKEN_API_KEY or not KRAKEN_API_SECRET:
-                logging.error("Kraken API Key/Secret not configured. Client will not initialize.")
+                logging.error("[KRAKEN] API Key/Secret not configured")
                 self.user = None
                 self.market = None
                 self.trade = None
@@ -27,46 +34,115 @@ class KrakenClient:
 
             # Test connection using the lock
             self.get_account_balance()
-            logging.info("KrakenClient initialized and connection tested.")
+            self.initialized = True
+            logging.info("[KRAKEN] Client initialized and connection tested")
         except Exception as e:
-            logging.error(f"Failed to initialize KrakenClient: {e}")
+            logging.error(f"[KRAKEN] Failed to initialize: {e}")
             self.user = None
             self.market = None
             self.trade = None
 
+    def _retry_with_backoff(self, operation, *args, **kwargs):
+        """
+        PHASE 2.4: Execute operation with exponential backoff retry logic
+
+        Handles transient errors (network issues, rate limits) with automatic retry.
+        Permanent errors (auth failures) are not retried.
+        """
+        for attempt in range(self.max_retries):
+            try:
+                return operation(*args, **kwargs)
+
+            except KrakenException as e:
+                error_msg = str(e).lower()
+
+                # Don't retry authentication/permission errors
+                if any(x in error_msg for x in ['permission', 'invalid key', 'invalid signature']):
+                    logging.error(f"[KRAKEN] Auth error (not retrying): {e}")
+                    raise
+
+                # Retry transient errors
+                if attempt < self.max_retries - 1:
+                    delay = self.base_delay * (2 ** attempt)
+                    logging.warning(
+                        f"[KRAKEN] Error (attempt {attempt + 1}/{self.max_retries}): {e} | "
+                        f"Retrying in {delay}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    logging.error(f"[KRAKEN] Failed after {self.max_retries} attempts: {e}")
+                    raise
+
+            except (ConnectionError, TimeoutError) as e:
+                if attempt < self.max_retries - 1:
+                    delay = self.base_delay * (2 ** attempt)
+                    logging.warning(
+                        f"[KRAKEN] Connection error (attempt {attempt + 1}/{self.max_retries}): {e} | "
+                        f"Retrying in {delay}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    logging.error(f"[KRAKEN] Connection failed after {self.max_retries} attempts")
+                    return {}
+
+            except Exception as e:
+                logging.error(f"[KRAKEN] Unexpected error: {e}")
+                if attempt < self.max_retries - 1:
+                    delay = self.base_delay * (2 ** attempt)
+                    time.sleep(delay)
+                else:
+                    return {}
+
     def get_account_balance(self) -> dict:
-        """Fetches the user's account balance using a lock for thread safety."""
+        """
+        PHASE 2.4: Fetches the user's account balance with retry logic.
+        Uses lock for thread safety and automatic retry on transient failures.
+        """
         if not self.user:
-            logging.error("Kraken client not initialized.")
+            logging.error("[KRAKEN] Client not initialized")
             return {}
-        try:
-            with self.nonce_lock:  # Apply lock here
+
+        def _fetch_balance():
+            with self.nonce_lock:
                 result = self.user.get_account_balance()
-                time.sleep(0.5)  # Delay to ensure proper nonce sequencing with Kraken's server
+                time.sleep(0.5)  # Nonce sequencing delay
                 return result
+
+        try:
+            return self._retry_with_backoff(_fetch_balance)
         except Exception as e:
-            logging.error(f"Error fetching account balance: {e}")
+            logging.error(f"[KRAKEN] Failed to fetch account balance: {e}")
             return {}
 
     def get_market_data(self, pair: str) -> dict:
-        """Fetches the latest ticker information for a given pair (Market endpoint does not need lock)."""
+        """
+        PHASE 2.4: Fetches the latest ticker information with retry logic.
+        Market endpoint does not need lock, but includes automatic retry.
+        """
         if not self.market:
-            logging.error("Kraken market client not initialized.")
+            logging.error("[KRAKEN] Market client not initialized")
             return {}
-        try:
+
+        def _fetch_ticker():
             result = self.market.get_ticker(pair=pair)
             if result and isinstance(result, dict) and pair in result:
                 return result[pair]
             return result if result else {}
+
+        try:
+            return self._retry_with_backoff(_fetch_ticker)
         except Exception as e:
-            logging.error(f"Error fetching market data for {pair}: {e}")
+            logging.error(f"[KRAKEN] Failed to fetch market data for {pair}: {e}")
             return {}
 
     def place_order(self, pair: str, order_type: str, direction: str, amount: float, price: float = None) -> dict:
-        """Places a new order on the exchange using a lock for thread safety."""
+        """
+        PHASE 2.4: Places a new order with retry logic.
+        Uses lock for thread safety and automatic retry on transient failures.
+        """
         if not self.trade:
-            logging.error("Kraken trade client not initialized. Order cancelled.")
-            return {"status": "error", "message": "Client not initialized."}
+            logging.error("[KRAKEN] Trade client not initialized")
+            return {"status": "error", "message": "Client not initialized"}
 
         order_params = {
             'ordertype': order_type,
@@ -78,11 +154,14 @@ class KrakenClient:
         if order_type == 'limit' and price:
             order_params['price'] = price
 
-        try:
-            with self.nonce_lock:  # Apply lock here
+        def _create_order():
+            with self.nonce_lock:
                 result = self.trade.create_order(**order_params)
-                time.sleep(0.5)  # Delay to ensure proper nonce sequencing with Kraken's server
+                time.sleep(0.5)  # Nonce sequencing delay
                 return result
+
+        try:
+            return self._retry_with_backoff(_create_order)
         except Exception as e:
-            logging.error(f"Error placing order: {e}")
+            logging.error(f"[KRAKEN] Failed to place order: {e}")
             return {"status": "error", "message": str(e)}

@@ -1,0 +1,253 @@
+# config/agent_config.yaml - PHASE 3.4: Centralized Agent Configuration
+#
+# This file consolidates all hardcoded parameters from across the system,
+# making it easier to tune the system without modifying code.
+
+# =============================================================================
+# TRADING CONFIGURATION
+# =============================================================================
+trading:
+  # Kraken trading fees and slippage (PHASE 2.1)
+  fees:
+    trading_fee_pct: 0.26      # Kraken taker fee (0.26%)
+    slippage_pct: 0.10         # Estimated slippage (0.10%)
+    total_cost_pct: 0.36       # Combined per-trade cost (0.36%)
+    round_trip_cost_pct: 0.72  # Full round trip cost (0.72%)
+
+# =============================================================================
+# RISK MANAGEMENT (PnLTracker - PHASE 3.1)
+# =============================================================================
+risk_management:
+  # Q2: Probation system thresholds
+  probation:
+    level_1_threshold: -5.0    # -5% triggers Probation Level 1
+    level_1_position_size: 0.5 # 50% position size in Probation 1
+
+    level_2_threshold: -10.0   # -10% triggers Probation Level 2
+    level_2_position_size: 0.25 # 25% position size in Probation 2
+
+  # Q9: Hibernation criteria
+  hibernation:
+    pnl_threshold: -15.0       # -15% cumulative P&L triggers hibernation
+    duration_days: 90          # 90 days in probation before hibernation
+
+# =============================================================================
+# CONSENSUS AND CAPACITY (PHASE 1)
+# =============================================================================
+consensus:
+  # Q1: Consensus logic
+  required_votes: 2            # 2 out of 3 agents must agree
+  total_agents: 3              # Rule of 3
+  confidence_threshold: 0.70   # 70% minimum confidence
+
+  # Q3: Asset capacity limits
+  max_active_assets: 15        # Hard limit on simultaneous assets
+  bootstrap_assets:            # Assets to track from start
+    - "XXBTZUSD"  # Bitcoin
+    - "XETHZUSD"  # Ethereum
+
+# =============================================================================
+# PROSPECTING (Market Explorer Agents - PHASE 1.1)
+# =============================================================================
+prospecting:
+  # Q4 & Q6: Cross-moat signal weighting
+  cross_moat_weight: 2.0       # 2x weight for cross-moat signals
+
+  # Prospecting score calculation (8-point scale)
+  scoring:
+    volume_points: 2           # High trading volume
+    volatility_points: 2       # Sufficient price movement
+    liquidity_points: 1        # Exchange liquidity
+    trend_points: 1            # Price trend direction
+    cross_moat_points: 2       # Cross-moat signals (Q4)
+
+  # Q8: MEA team specialization
+  team_specialization:
+    HFT:
+      ignore_moats: ["Government", "Logistics"]  # HFT ignores slow moats
+    Swing:
+      prioritize_moats: ["Government", "Logistics"]  # Swing prioritizes slow moats
+    DayTrade:
+      balanced: true           # DayTrade uses all moats
+
+# =============================================================================
+# TECHNICAL ANALYSIS (PHASE 1.2)
+# =============================================================================
+technical_analysis:
+  # RSI (Relative Strength Index)
+  rsi:
+    period: 14
+    overbought: 70
+    oversold: 30
+
+  # MACD (Moving Average Convergence Divergence)
+  macd:
+    fast_period: 12
+    slow_period: 26
+    signal_period: 9
+
+  # Bollinger Bands
+  bollinger:
+    period: 20
+    std_dev: 2
+
+  # Moving averages
+  ema:
+    short_period: 9
+    long_period: 21
+
+# =============================================================================
+# DATA MOAT AGENTS (PHASE 3.2 & 3.3)
+# =============================================================================
+data_moats:
+  # Code moat (GitHub API)
+  code:
+    fetch_interval: 300        # 5 minutes between fetches
+    cache_enabled: true
+
+    # Q7: Crypto repositories to track
+    repositories:
+      Solidity:
+        - "ethereum/go-ethereum"
+        - "Uniswap/v3-core"
+        - "aave/aave-v3-core"
+        - "compound-finance/compound-protocol"
+
+      Rust:
+        - "solana-labs/solana"
+        - "paritytech/substrate"
+        - "near/nearcore"
+
+      Go:
+        - "cosmos/cosmos-sdk"
+        - "tendermint/tendermint"
+
+      Python:
+        - "ethereum/py-evm"
+        - "vyperlang/vyper"
+
+    # Dependency entropy calculation
+    metrics:
+      commits_lookback_hours: 24
+      min_contributors: 5
+      entropy_formula: "contributors * log(commits) / sqrt(issues)"
+
+  # Market data moat
+  market:
+    fetch_interval: 60         # 1 minute between fetches
+    cache_enabled: true
+    history_buffer_size: 42    # period * 3 for stability
+
+  # Logistics moat (simulated)
+  logistics:
+    fetch_interval: 300        # 5 minutes
+    cache_enabled: true
+    target_regions:
+      - "US-West"
+      - "US-East"
+      - "EU-Central"
+      - "Asia-Pacific"
+
+  # Government moat (simulated)
+  government:
+    fetch_interval: 3600       # 1 hour (slow-moving data)
+    cache_enabled: true
+    target_regions:
+      - "US-Federal"
+      - "EU-Commission"
+      - "UK-Parliament"
+
+  # Corporate moat (simulated)
+  corporate:
+    fetch_interval: 1800       # 30 minutes
+    cache_enabled: true
+    target_sectors:
+      - "Tech"
+      - "Finance"
+      - "Energy"
+
+# =============================================================================
+# BUILDER AGENT (PHASE 1.3)
+# =============================================================================
+builder:
+  # Q3: Capacity and deployment
+  check_interval: 5            # Check consensus every 5 seconds
+  deployment_cooldown: 3600    # 1 hour cooldown per pair
+
+  # Agent team composition (19 agents per asset)
+  team_composition:
+    data_miners: 1
+    technical_analysts: 3      # Rule of 3
+    pattern_learners: 15
+
+  # Deployment statistics tracking
+  track_statistics: true
+
+# =============================================================================
+# DATABASE AND PERSISTENCE
+# =============================================================================
+database:
+  # SQLite configuration (PHASE 2.2)
+  sqlite:
+    path: "mycelial_ledger.db"
+    thread_safe_writes: true   # Use write queue
+    write_queue_size: 1000
+
+  # Redis configuration (PHASE 2.3)
+  redis:
+    scan_batch_size: 100       # SCAN command batch size
+    pattern_archive_enabled: true
+
+# =============================================================================
+# ERROR RECOVERY (PHASE 2.4)
+# =============================================================================
+error_recovery:
+  # Redis client
+  redis:
+    max_retries: 5
+    base_delay: 1.0            # Exponential backoff: 1s, 2s, 4s, 8s, 16s
+    max_retry_delay: 60.0
+    socket_connect_timeout: 5
+    health_check_interval: 30
+
+  # Kraken client
+  kraken:
+    max_retries: 3
+    base_delay: 2.0            # Exponential backoff: 2s, 4s, 8s
+    nonce_delay: 0.5           # Delay between nonce-based requests
+
+# =============================================================================
+# AGENT LIFECYCLE
+# =============================================================================
+agent_lifecycle:
+  # Step intervals (seconds)
+  data_miner: 60
+  technical_analyst: 60
+  pattern_learner: 300
+  market_explorer: 300
+  repo_scrape: 300
+
+  # Agent limits
+  max_concurrent_agents: 500
+
+# =============================================================================
+# LOGGING AND MONITORING
+# =============================================================================
+logging:
+  level: "INFO"                # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+
+  # Component-specific levels
+  components:
+    data_moats: "INFO"
+    trading: "INFO"
+    consensus: "INFO"
+    risk_management: "WARNING"
+
+# =============================================================================
+# ENVIRONMENT OVERRIDES
+# =============================================================================
+# Use environment-specific config files to override these defaults:
+# - agent_config.dev.yaml  (development)
+# - agent_config.prod.yaml (production)
+# - agent_config.test.yaml (testing)

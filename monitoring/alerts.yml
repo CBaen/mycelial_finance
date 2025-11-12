@@ -1,0 +1,219 @@
+# monitoring/alerts.yml - PHASE 4.3: Prometheus Alerting Rules
+# Alert rules for Mycelial Finance monitoring
+
+groups:
+  # ==========================================================================
+  # SYSTEM HEALTH ALERTS
+  # ==========================================================================
+  - name: system_health
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: mycelial_system_cpu_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% (threshold: 80%)"
+
+      - alert: CriticalCPUUsage
+        expr: mycelial_system_cpu_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical CPU usage detected"
+          description: "CPU usage is {{ $value }}% (threshold: 95%)"
+
+      - alert: HighMemoryUsage
+        expr: mycelial_system_memory_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% (threshold: 85%)"
+
+      - alert: CriticalMemoryUsage
+        expr: mycelial_system_memory_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical memory usage detected"
+          description: "Memory usage is {{ $value }}% (threshold: 95%)"
+
+  # ==========================================================================
+  # REDIS CONNECTIVITY ALERTS
+  # ==========================================================================
+  - name: redis_health
+    interval: 15s
+    rules:
+      - alert: RedisDown
+        expr: mycelial_redis_connection_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis connection lost"
+          description: "Redis has been unreachable for 1 minute"
+
+      - alert: RedisHighMemory
+        expr: mycelial_redis_used_memory_bytes > 1.8e9  # 1.8GB (90% of 2GB limit)
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis using {{ $value | humanize }}B (limit: 2GB)"
+
+  # ==========================================================================
+  # AGENT HEALTH ALERTS
+  # ==========================================================================
+  - name: agent_health
+    interval: 30s
+    rules:
+      - alert: NoActiveAgents
+        expr: mycelial_active_agents_total == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: agents
+        annotations:
+          summary: "No active agents detected"
+          description: "System has no active agents for 2 minutes"
+
+      - alert: LowAgentCount
+        expr: mycelial_active_agents_total < 10
+        for: 5m
+        labels:
+          severity: warning
+          component: agents
+        annotations:
+          summary: "Low agent count"
+          description: "Only {{ $value }} agents active (expected: 10+)"
+
+      - alert: HighDeploymentRejectionRate
+        expr: rate(mycelial_deployments_rejected_total[5m]) / rate(mycelial_deployments_attempted_total[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: builder
+        annotations:
+          summary: "High deployment rejection rate"
+          description: "{{ $value | humanizePercentage }} of deployments rejected in last 5min"
+
+  # ==========================================================================
+  # TRADING ALERTS
+  # ==========================================================================
+  - name: trading_health
+    interval: 1m
+    rules:
+      - alert: NegativePnL
+        expr: mycelial_cumulative_pnl_percent < -5
+        for: 1h
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "Negative P&L detected for {{ $labels.asset }}"
+          description: "Asset {{ $labels.asset }} has {{ $value }}% P&L (threshold: -5%)"
+
+      - alert: CriticalPnL
+        expr: mycelial_cumulative_pnl_percent < -10
+        for: 30m
+        labels:
+          severity: critical
+          component: trading
+        annotations:
+          summary: "Critical P&L for {{ $labels.asset }}"
+          description: "Asset {{ $labels.asset }} has {{ $value }}% P&L (entering probation)"
+
+      - alert: NoActiveTradingAssets
+        expr: mycelial_active_assets_total == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "No active trading assets"
+          description: "System has no active assets for 10 minutes"
+
+      - alert: LowWinRate
+        expr: mycelial_win_rate_percent < 40
+        for: 6h
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "Low win rate for {{ $labels.asset }}"
+          description: "Asset {{ $labels.asset }} win rate is {{ $value }}% (threshold: 40%)"
+
+  # ==========================================================================
+  # DATA MOAT ALERTS
+  # ==========================================================================
+  - name: data_moat_health
+    interval: 5m
+    rules:
+      - alert: HighMoatAPIErrorRate
+        expr: rate(mycelial_moat_api_errors_total[10m]) / rate(mycelial_moat_api_calls_total[10m]) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          component: data_moats
+        annotations:
+          summary: "High API error rate for {{ $labels.moat_type }} moat"
+          description: "{{ $value | humanizePercentage }} error rate in last 10min"
+
+      - alert: MoatDataStale
+        expr: (time() - mycelial_moat_last_update_timestamp) > 600  # 10 minutes
+        for: 5m
+        labels:
+          severity: warning
+          component: data_moats
+        annotations:
+          summary: "Stale data from {{ $labels.moat_type }} moat"
+          description: "No updates from {{ $labels.moat_type }} moat for {{ $value }}s"
+
+      - alert: HighMoatAPILatency
+        expr: histogram_quantile(0.95, rate(mycelial_moat_api_latency_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: data_moats
+        annotations:
+          summary: "High API latency for {{ $labels.moat_type }} moat"
+          description: "95th percentile latency is {{ $value }}s (threshold: 5s)"
+
+  # ==========================================================================
+  # CONSENSUS ALERTS
+  # ==========================================================================
+  - name: consensus_health
+    interval: 5m
+    rules:
+      - alert: LowConsensusRate
+        expr: rate(mycelial_consensus_reached_total[1h]) < 0.01  # Less than 1 per 100 seconds
+        for: 2h
+        labels:
+          severity: warning
+          component: consensus
+        annotations:
+          summary: "Low consensus rate"
+          description: "Only {{ $value }} consensus events per second in last hour"
+
+      - alert: NoConsensusActivity
+        expr: rate(mycelial_consensus_reached_total[30m]) == 0
+        for: 1h
+        labels:
+          severity: warning
+          component: consensus
+        annotations:
+          summary: "No consensus activity"
+          description: "No consensus reached in last 30 minutes"

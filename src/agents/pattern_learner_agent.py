@@ -8,6 +8,11 @@ import numpy as np
 import json
 from collections import deque
 
+# PHASE 2.1: Realistic trading costs (Kraken fees + market impact)
+TRADING_FEE_PCT = 0.26  # 0.26% per trade (Kraken maker/taker average)
+SLIPPAGE_PCT = 0.10     # 0.10% slippage (market impact)
+TOTAL_COST_PCT = (TRADING_FEE_PCT + SLIPPAGE_PCT) / 100.0  # 0.0036 (0.36% per trade)
+
 class PatternLearnerAgent(MycelialAgent):
     """
     BIG ROCK 41: ProfitSeekerAgent - The Alpha Tournament Engine
@@ -186,9 +191,15 @@ class PatternLearnerAgent(MycelialAgent):
             simulated_pnl = 0.0
 
         elif direction == "sell" and self.entry_price > 0:
-            # Closing a LONG position - calculate realized P&L
+            # Closing a LONG position - calculate realized P&L (PHASE 2.1: with fees + slippage)
             # P&L = (Exit Price - Entry Price) / Entry Price * 100 (percentage)
-            simulated_pnl = ((current_price - self.entry_price) / self.entry_price) * 100
+            raw_pnl = ((current_price - self.entry_price) / self.entry_price) * 100
+
+            # PHASE 2.1: Apply trading costs (0.36% round trip: 0.26% fee + 0.10% slippage)
+            total_cost_pct = TOTAL_COST_PCT * 2 * 100  # Buy + sell = 2 trades
+
+            # Net P&L after costs
+            simulated_pnl = raw_pnl - total_cost_pct
 
             # Update cumulative stats
             self.total_pnl += simulated_pnl

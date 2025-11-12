@@ -23,6 +23,7 @@ import sqlite3  # BIG ROCK 31: SQL Persistence
 import json
 import time
 import threading  # BIG ROCK 31: Graceful Shutdown
+import queue  # PHASE 2.2: Thread-safe SQLite write queue
 
 class MycelialModel(mesa.Model):
     """
@@ -65,6 +66,24 @@ class MycelialModel(mesa.Model):
         self.archived_pattern_count = 0
         self.archive_check_interval = 300  # Check every 5 minutes (300 steps)
 
+        # BIG ROCK 43: Active asset tracking (Q3: max 15 assets)
+        self.active_assets = {}  # {pair: {"team_type": str, "confidence": float, "status": str, "deployed_at": float}}
+        self.max_active_assets = 15
+
+        # Initialize with bootstrap assets (BTC, ETH)
+        self.active_assets["XXBTZUSD"] = {
+            "team_type": "Bootstrap",
+            "confidence": 1.0,
+            "status": "active",
+            "deployed_at": time.time()
+        }
+        self.active_assets["XETHZUSD"] = {
+            "team_type": "Bootstrap",
+            "confidence": 1.0,
+            "status": "active",
+            "deployed_at": time.time()
+        }
+
         # Store HAVEN Framework parameters
         self.risk_governance_enabled = risk_governance_enabled
         self.max_drawdown_percent = max_drawdown_percent
@@ -97,11 +116,16 @@ class MycelialModel(mesa.Model):
             self.running = False
             return
 
-        # BIG ROCK 31: SQL Database Initialization (Pattern Persistence)
+        # PHASE 2.2: SQL Database Initialization with Thread-Safe Write Queue
         self.db_connection = None
         self.db_cursor = None
+        self.db_write_queue = queue.Queue()  # Thread-safe write queue
+        self.db_writer_thread = None  # Background writer thread
+
         try:
-            self.db_connection = sqlite3.connect('mycelial_patterns.db', check_same_thread=False)
+            # PHASE 2.2: Remove check_same_thread=False (was dangerous)
+            # Connection only used by dedicated writer thread
+            self.db_connection = sqlite3.connect('mycelial_patterns.db', check_same_thread=True)
             self.db_cursor = self.db_connection.cursor()
 
             # Create patterns table if it doesn't exist
@@ -237,20 +261,42 @@ class MycelialModel(mesa.Model):
             researcher = DeepResearchAgent(self)
             self.register_agent(researcher)
 
-        # 12. BIG ROCK 39: Create TECHNICAL ANALYSIS AGENTS (Competitive Baseline)
-        for i in range(num_ta_agents):
-            ta_agent = TechnicalAnalysisAgent(self)
-            self.register_agent(ta_agent)
+        # 12. BIG ROCK 43: Create MARKET EXPLORER AGENT TEAMS (Rule of 3 Prospecting)
+        # Deploy 9 MEAs in 3 specialized teams: HFT, DayTrade, Swing
+        logging.info("Deploying 9 Market Explorer Agents (3 teams of 3 for Rule of 3)...")
 
-        # 13. BIG ROCK 39: Create MARKET EXPLORER AGENTS (Market Discovery)
-        for i in range(num_explorer_agents):
-            explorer = MarketExplorerAgent(self)
-            self.register_agent(explorer)
+        for team_id in range(1, 4):  # 3 agents per team
+            # HFT Team (fast-moving assets, prioritize Code/Corporate moats)
+            hft_explorer = MarketExplorerAgent(self, team_type="HFT", team_id=team_id)
+            self.register_agent(hft_explorer)
+
+            # DayTrade Team (balanced approach)
+            daytrade_explorer = MarketExplorerAgent(self, team_type="DayTrade", team_id=team_id)
+            self.register_agent(daytrade_explorer)
+
+            # Swing Team (longer-term, prioritize Gov/Logistics moats)
+            swing_explorer = MarketExplorerAgent(self, team_type="Swing", team_id=team_id)
+            self.register_agent(swing_explorer)
+
+        logging.info("[BIG ROCK 43] 9 MEAs deployed: 3 HFT + 3 DayTrade + 3 Swing teams")
+
+        # Note: Technical Analysis Agents are now deployed dynamically per asset by BuilderAgent
+        # No longer deployed globally at startup
 
         agent_count = len(self.agents)
         logging.info(f"Mycelial Swarm created. Model initialized with {agent_count} total agents, covering ALL 5 Product Pillars: Finance, Code, Logistics, Government, and Corporations.")
         logging.info(f"[BIG ROCK 32] Collaborative Architecture: {num_instigators} Instigator Agents + {num_research_agents} Deep Research Agents deployed")
-        logging.info(f"[BIG ROCK 39] Final Architecture: {num_ta_agents} Technical Analysis Agents + {num_explorer_agents} Market Explorer Agents deployed")
+        logging.info(f"[BIG ROCK 43] Dynamic Prospecting Architecture: 9 MEA teams + 1 Builder Agent (TA agents deployed per-asset)")
+
+        # BIG ROCK 43: Start consensus checking thread (Q1: 2/3 majority with >70% confidence)
+        self.consensus_thread = threading.Thread(target=self._consensus_checking_loop, daemon=True)
+        self.consensus_thread.start()
+        logging.info("[BIG ROCK 43] Consensus checking thread started (checks every 5 seconds)")
+
+        # PHASE 2.2: Start SQLite writer thread (thread-safe writes)
+        self.db_writer_thread = threading.Thread(target=self._db_writer_loop, daemon=True)
+        self.db_writer_thread.start()
+        logging.info("[PHASE 2.2] SQLite writer thread started (thread-safe write queue)")
 
         if self.risk_governance_enabled:
             logging.info("=" * 80)
@@ -349,6 +395,339 @@ class MycelialModel(mesa.Model):
         except Exception as e:
             logging.error(f"[SHUTDOWN] Error during emergency shutdown: {e}")
 
+    def register_active_asset(self, pair: str, team_type: str, confidence: float):
+        """
+        BIG ROCK 43: Register new asset as active after Builder Agent deploys team
+        """
+        self.active_assets[pair] = {
+            "team_type": team_type,
+            "confidence": confidence,
+            "status": "active",
+            "deployed_at": time.time()
+        }
+        logging.info(
+            f"[MODEL] Registered {pair} as active | "
+            f"Team: {team_type} | Confidence: {confidence:.2%} | "
+            f"Active assets: {len(self.active_assets)}/{self.max_active_assets}"
+        )
+
+    def hibernate_asset(self, pair: str):
+        """
+        BIG ROCK 43 (Q9): Hibernate asset after 90 days probation
+
+        Hibernation preserves learned patterns while freeing compute resources:
+        1. Mark asset as "hibernated" (not fully removed)
+        2. Kill all agents for this pair (1 miner + 3 TAA + 15 learners)
+        3. Archive patterns to SQLite/ChromaDB
+        4. Asset can be "reawakened" if MEA consensus re-triggers
+        """
+        if pair not in self.active_assets:
+            logging.warning(f"[MODEL] Cannot hibernate {pair} - not in active_assets")
+            return
+
+        # Update status
+        self.active_assets[pair]["status"] = "hibernated"
+        self.active_assets[pair]["hibernated_at"] = time.time()
+
+        # Kill agents for this pair
+        agents_to_remove = []
+        for agent in list(self.agents):
+            if hasattr(agent, 'pair') and agent.pair == pair:
+                agents_to_remove.append(agent)
+
+        for agent in agents_to_remove:
+            self.schedule.remove(agent)
+
+        # Archive patterns before hibernation
+        self._archive_asset_patterns(pair)
+
+        logging.info(
+            f"[MODEL] Hibernated {pair} | "
+            f"Removed {len(agents_to_remove)} agents | "
+            f"Status: {self.active_assets[pair]['status']}"
+        )
+
+    def _archive_asset_patterns(self, pair: str):
+        """
+        BIG ROCK 43 (Q9): Archive all patterns for hibernated asset
+
+        This preserves learned causal relationships so if the asset
+        becomes interesting again, we can "reawaken" with historical context.
+        """
+        try:
+            # PHASE 2.3: Query Redis for all patterns using non-blocking SCAN
+            pattern_keys = self._scan_patterns("policy:*")
+            archived_count = 0
+
+            for key in pattern_keys:
+                policy_data = self.redis_client.connection.get(key)
+                if policy_data:
+                    policy = json.loads(policy_data)
+                    agent_id = policy.get('agent_id')
+
+                    # Check if this agent was working on the hibernated pair
+                    # (Agent names contain pair, e.g., "SwarmBrain_42_Finance")
+                    # For Finance agents, store all patterns as they may have traded this pair
+                    if policy.get('product_focus') == 'Finance':
+                        # PHASE 2.2: Archive to SQLite via thread-safe queue
+                        try:
+                            self._queue_db_write(
+                                """INSERT INTO patterns
+                                   (agent_id, timestamp, pattern_value, raw_features, age_minutes, decay_factor)
+                                   VALUES (?, ?, ?, ?, ?, ?)""",
+                                (
+                                    agent_id,
+                                    time.time(),
+                                    policy.get('pattern_current_value', 0),
+                                    json.dumps(policy.get('raw_features', {})),
+                                    policy.get('pattern_age_minutes', 0),
+                                    policy.get('pattern_decay_factor', 1.0)
+                                )
+                            )
+                            archived_count += 1
+                        except Exception as insert_error:
+                            logging.error(f"[ARCHIVE] Failed to queue pattern for {agent_id}: {insert_error}")
+
+            # PHASE 2.2: Queue commit instead of direct execution
+            self._queue_db_commit()
+
+            logging.info(f"[ARCHIVE] Archived {archived_count} patterns for hibernated asset {pair}")
+
+        except Exception as e:
+            logging.error(f"[ARCHIVE] Error archiving patterns for {pair}: {e}")
+
+    def _consensus_checking_loop(self):
+        """
+        BIG ROCK 43 (Q1): Background thread that checks for MEA consensus
+
+        Runs every 5 seconds, checking if 2/3 agents in any team agree
+        with >70% confidence on a prospecting opportunity.
+
+        This is the "heartbeat" of the dynamic prospecting engine.
+        """
+        import time as time_module
+        from collections import defaultdict
+
+        logging.info("[CONSENSUS] Consensus checking loop started")
+
+        while self.running:
+            try:
+                time_module.sleep(5)  # Check every 5 seconds
+
+                # Check each team type for consensus
+                for team_type in ["HFT", "DayTrade", "Swing"]:
+                    self._check_team_consensus(team_type)
+
+            except Exception as e:
+                logging.error(f"[CONSENSUS] Error in consensus checking loop: {e}")
+
+        logging.info("[CONSENSUS] Consensus checking loop stopped")
+
+    def _check_team_consensus(self, team_type: str):
+        """
+        BIG ROCK 43 (Q1): Check if 2/3 agents in team agree on asset
+
+        Rule of 3 Logic:
+        - Need at least 2 out of 3 agents agreeing (2/3 majority)
+        - Average confidence must exceed 70%
+        - Proposals must be within 60-second window
+        """
+        from collections import defaultdict
+
+        try:
+            # Fetch recent proposals from Redis channel
+            # In production, this would scan a Redis sorted set with timestamps
+            # For now, we simulate by checking if agents have published recently
+
+            # Get recent proposals (last 60 seconds)
+            proposals = self._get_recent_proposals(team_type, window=60)
+
+            if not proposals:
+                return
+
+            # Group proposals by pair
+            pair_votes = defaultdict(list)
+            for proposal in proposals:
+                pair = proposal.get('pair')
+                if pair:
+                    pair_votes[pair].append({
+                        'agent': proposal.get('source'),
+                        'confidence': proposal.get('confidence', 0),
+                        'timestamp': proposal.get('timestamp', 0)
+                    })
+
+            # Check each pair for consensus
+            for pair, votes in pair_votes.items():
+                # Q1: Need at least 2/3 agents (2 out of 3)
+                if len(votes) >= 2:
+                    # Calculate average confidence
+                    avg_confidence = sum(v['confidence'] for v in votes) / len(votes)
+
+                    # Q1: Confidence must exceed 70%
+                    if avg_confidence > 0.70:
+                        logging.info(
+                            f"[CONSENSUS] ✓ {team_type} CONSENSUS REACHED for {pair} | "
+                            f"Votes: {len(votes)}/3 | Confidence: {avg_confidence:.2%}"
+                        )
+
+                        # Publish consensus to Builder Agent
+                        self.redis_client.publish("prospecting-consensus", {
+                            "pair": pair,
+                            "team_type": team_type,
+                            "votes": len(votes),
+                            "confidence": avg_confidence,
+                            "timestamp": time.time()
+                        })
+
+        except Exception as e:
+            logging.error(f"[CONSENSUS] Error checking {team_type} consensus: {e}")
+
+    def _get_recent_proposals(self, team_type: str, window: int = 60) -> list:
+        """
+        BIG ROCK 43: Fetch recent MEA proposals from Redis
+
+        In production, this would query a Redis sorted set with timestamps.
+        For now, we scan the prospecting-proposals:{team_type} channel history.
+
+        Returns: List of proposal messages within the time window
+        """
+        try:
+            # In production: Redis sorted set with ZRANGEBYSCORE
+            # For simulation: Return empty list (agents publish directly)
+            # The real implementation would look like:
+            #
+            # current_time = time.time()
+            # min_timestamp = current_time - window
+            # proposals = self.redis_client.connection.zrangebyscore(
+            #     f"proposals:{team_type}",
+            #     min_timestamp,
+            #     current_time
+            # )
+            # return [json.loads(p) for p in proposals]
+
+            # TEMP: For Phase 1, return empty (consensus happens via direct pubsub)
+            return []
+
+        except Exception as e:
+            logging.error(f"[CONSENSUS] Error fetching proposals for {team_type}: {e}")
+            return []
+
+    def _db_writer_loop(self):
+        """
+        PHASE 2.2: Dedicated SQLite writer thread
+
+        This thread is the ONLY thread that writes to SQLite, eliminating
+        all thread safety issues. Other threads submit write requests via
+        the thread-safe queue.
+
+        Queue message format: ('INSERT', sql_query, params) or ('COMMIT',)
+        """
+        import time as time_module
+
+        logging.info("[DB_WRITER] SQLite writer thread started")
+
+        while self.running:
+            try:
+                # Block with 1-second timeout to allow graceful shutdown
+                try:
+                    task = self.db_write_queue.get(timeout=1.0)
+                except queue.Empty:
+                    continue
+
+                if task[0] == 'INSERT':
+                    _, sql_query, params = task
+                    try:
+                        self.db_cursor.execute(sql_query, params)
+                    except Exception as insert_error:
+                        logging.error(f"[DB_WRITER] Failed to execute INSERT: {insert_error}")
+
+                elif task[0] == 'COMMIT':
+                    try:
+                        self.db_connection.commit()
+                    except Exception as commit_error:
+                        logging.error(f"[DB_WRITER] Failed to COMMIT: {commit_error}")
+
+                elif task[0] == 'SHUTDOWN':
+                    # Final commit before shutdown
+                    try:
+                        self.db_connection.commit()
+                    except Exception as e:
+                        logging.error(f"[DB_WRITER] Failed final commit: {e}")
+                    break
+
+                self.db_write_queue.task_done()
+
+            except Exception as e:
+                logging.error(f"[DB_WRITER] Error in writer loop: {e}")
+
+        logging.info("[DB_WRITER] SQLite writer thread stopped")
+
+    def _queue_db_write(self, sql_query: str, params: tuple):
+        """
+        PHASE 2.2: Submit write request to thread-safe queue
+
+        This method is called from any thread to safely write to SQLite.
+        The actual write is performed by the dedicated writer thread.
+        """
+        try:
+            self.db_write_queue.put(('INSERT', sql_query, params))
+        except Exception as e:
+            logging.error(f"[DB_WRITE] Error queuing write: {e}")
+
+    def _queue_db_commit(self):
+        """
+        PHASE 2.2: Submit commit request to thread-safe queue
+        """
+        try:
+            self.db_write_queue.put(('COMMIT',))
+        except Exception as e:
+            logging.error(f"[DB_COMMIT] Error queuing commit: {e}")
+
+    def _scan_patterns(self, pattern: str) -> list:
+        """
+        PHASE 2.3: Non-blocking Redis pattern scan
+
+        Replaces blocking KEYS command with incremental SCAN.
+        SCAN iterates through the keyspace in chunks, yielding control
+        between batches to prevent Redis from blocking.
+
+        Args:
+            pattern: Redis key pattern (e.g., "policy:*")
+
+        Returns:
+            List of matching keys
+        """
+        cursor = 0
+        keys = []
+
+        try:
+            while True:
+                # SCAN returns (cursor, batch) tuple
+                # cursor=0 means iteration complete
+                cursor, batch = self.redis_client.connection.scan(
+                    cursor=cursor,
+                    match=pattern,
+                    count=100  # Batch size (Redis default)
+                )
+
+                # Decode bytes to strings if needed
+                decoded_batch = [
+                    k.decode('utf-8') if isinstance(k, bytes) else k
+                    for k in batch
+                ]
+                keys.extend(decoded_batch)
+
+                # cursor=0 signals end of iteration
+                if cursor == 0:
+                    break
+
+            logging.debug(f"[SCAN] Found {len(keys)} keys matching '{pattern}'")
+            return keys
+
+        except Exception as e:
+            logging.error(f"[SCAN] Error scanning pattern '{pattern}': {e}")
+            return []
+
     def _archive_high_value_patterns(self):
         """
         BIG ROCK 31: Pattern Archiving with SQL Persistence.
@@ -364,8 +743,8 @@ class MycelialModel(mesa.Model):
         5. Commit transaction for durability
         """
         try:
-            # Scan for all agent policies in Redis
-            pattern_keys = self.redis_client.connection.keys("policy:*")
+            # PHASE 2.3: Scan for all agent policies using non-blocking SCAN
+            pattern_keys = self._scan_patterns("policy:*")
             high_value_patterns = []
 
             for key in pattern_keys:
@@ -391,50 +770,47 @@ class MycelialModel(mesa.Model):
                            f"Found {len(high_value_patterns)} high-value patterns (>40 after decay). "
                            f"Total archived: {self.archived_pattern_count}")
 
-                # BIG ROCK 31: SQL Persistence (Production Implementation)
-                if self.db_cursor and self.db_connection:
-                    for pattern in high_value_patterns:
-                        try:
-                            self.db_cursor.execute(
-                                """INSERT INTO patterns
-                                   (agent_id, timestamp, pattern_value, raw_features, age_minutes, decay_factor)
-                                   VALUES (?, ?, ?, ?, ?, ?)""",
-                                (
-                                    pattern['agent_id'],
-                                    time.time(),
-                                    pattern['pattern_value'],
-                                    json.dumps(pattern['raw_features']),
-                                    pattern['age_minutes'],
-                                    pattern['decay_factor']
-                                )
+                # PHASE 2.2: SQL Persistence via Thread-Safe Queue
+                for pattern in high_value_patterns:
+                    try:
+                        self._queue_db_write(
+                            """INSERT INTO patterns
+                               (agent_id, timestamp, pattern_value, raw_features, age_minutes, decay_factor)
+                               VALUES (?, ?, ?, ?, ?, ?)""",
+                            (
+                                pattern['agent_id'],
+                                time.time(),
+                                pattern['pattern_value'],
+                                json.dumps(pattern['raw_features']),
+                                pattern['age_minutes'],
+                                pattern['decay_factor']
                             )
-                        except Exception as insert_error:
-                            logging.error(f"[ARCHIVE] Failed to insert pattern for agent {pattern['agent_id']}: {insert_error}")
+                        )
+                    except Exception as insert_error:
+                        logging.error(f"[ARCHIVE] Failed to queue pattern for agent {pattern['agent_id']}: {insert_error}")
 
-                    # Commit all inserts in a single transaction
-                    self.db_connection.commit()
-                    logging.info(f"[SQL] {len(high_value_patterns)} patterns persisted to database")
+                # Queue commit for all inserts
+                self._queue_db_commit()
+                logging.info(f"[SQL] {len(high_value_patterns)} patterns queued for persistence")
 
-                    # BIG ROCK 40: Send validation requests to Deep Research agents
-                    for pattern in high_value_patterns:
-                        validation_request = {
-                            'pattern_id': f"{pattern['agent_id']}_{int(time.time())}",
-                            'pattern_data': {
-                                'agent_id': pattern['agent_id'],
-                                'pattern_value': pattern['pattern_value'],
-                                'prediction_score': pattern['pattern_value'] / 100.0,  # Normalize to 0-1
-                                'interestingness_score': min(pattern['pattern_value'] * 1.2, 100),  # Boost for archived patterns
-                                'raw_features': pattern['raw_features'],
-                                'age_minutes': pattern['age_minutes'],
-                                'decay_factor': pattern['decay_factor']
-                            },
-                            'timestamp': time.time()
-                        }
-                        self.redis_client.publish("pattern-validation-request", json.dumps(validation_request))
+                # BIG ROCK 40: Send validation requests to Deep Research agents
+                for pattern in high_value_patterns:
+                    validation_request = {
+                        'pattern_id': f"{pattern['agent_id']}_{int(time.time())}",
+                        'pattern_data': {
+                            'agent_id': pattern['agent_id'],
+                            'pattern_value': pattern['pattern_value'],
+                            'prediction_score': pattern['pattern_value'] / 100.0,  # Normalize to 0-1
+                            'interestingness_score': min(pattern['pattern_value'] * 1.2, 100),  # Boost for archived patterns
+                            'raw_features': pattern['raw_features'],
+                            'age_minutes': pattern['age_minutes'],
+                            'decay_factor': pattern['decay_factor']
+                        },
+                        'timestamp': time.time()
+                    }
+                    self.redis_client.publish("pattern-validation-request", json.dumps(validation_request))
 
-                    logging.info(f"[VALIDATION] Sent {len(high_value_patterns)} validation requests to Deep Research agents")
-                else:
-                    logging.warning("[ARCHIVE] Database not available - patterns not persisted")
+                logging.info(f"[VALIDATION] Sent {len(high_value_patterns)} validation requests to Deep Research agents")
             else:
                 elapsed_minutes = self.step_counter // 60
                 logging.info(f"[ARCHIVE] Step {self.step_counter} ({elapsed_minutes}min): No high-value patterns to archive (threshold: 40)")

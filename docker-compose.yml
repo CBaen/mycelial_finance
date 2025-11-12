@@ -1,0 +1,230 @@
+# docker-compose.yml - PHASE 4.2: Multi-Service Orchestration
+# Complete deployment stack for Mycelial Finance
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # Redis - Message Broker and Cache
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: mycelial-redis
+    restart: unless-stopped
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - redis-data:/data
+
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - mycelial-network
+
+  # ===========================================================================
+  # Mycelial Finance - Main Trading Bot
+  # ===========================================================================
+  trading-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: mycelial-trading-bot
+    restart: unless-stopped
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    environment:
+      # Redis configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # Application environment
+      - APP_ENV=prod
+      - PYTHONUNBUFFERED=1
+
+      # Kraken API credentials (use secrets in production)
+      - KRAKEN_API_KEY=${KRAKEN_API_KEY}
+      - KRAKEN_API_SECRET=${KRAKEN_API_SECRET}
+
+      # GitHub API token (for Code moat)
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+
+    volumes:
+      # Persistent data storage
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+      # Configuration files
+      - ./config:/app/config:ro
+
+      # Database persistence
+      - ./mycelial_ledger.db:/app/mycelial_ledger.db
+
+    networks:
+      - mycelial-network
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # ===========================================================================
+  # Dashboard - Streamlit Web Interface
+  # ===========================================================================
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: mycelial-dashboard
+    restart: unless-stopped
+
+    depends_on:
+      redis:
+        condition: service_healthy
+      trading-bot:
+        condition: service_started
+
+    command: streamlit run dashboard.py --server.port=8501 --server.address=0.0.0.0
+
+    ports:
+      - "8501:8501"
+
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - APP_ENV=prod
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+
+    networks:
+      - mycelial-network
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+
+  # ===========================================================================
+  # Prometheus - Metrics Collection (PHASE 4.3)
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mycelial-prometheus
+    restart: unless-stopped
+
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+
+    ports:
+      - "9090:9090"
+
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+
+    networks:
+      - mycelial-network
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # ===========================================================================
+  # Grafana - Metrics Visualization (PHASE 4.3)
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mycelial-grafana
+    restart: unless-stopped
+
+    depends_on:
+      - prometheus
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+
+    networks:
+      - mycelial-network
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # ===========================================================================
+  # OPTIONAL: Redis Commander - Redis Web UI
+  # ===========================================================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: mycelial-redis-commander
+    restart: unless-stopped
+
+    profiles:
+      - debug  # Only run when explicitly requested: docker-compose --profile debug up
+
+    depends_on:
+      - redis
+
+    ports:
+      - "8081:8081"
+
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+
+    networks:
+      - mycelial-network
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  mycelial-network:
+    driver: bridge
+
+# =============================================================================
+# Volumes - Persistent Data Storage
+# =============================================================================
+volumes:
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

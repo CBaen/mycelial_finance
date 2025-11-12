@@ -1,0 +1,46 @@
+# monitoring/prometheus.yml - PHASE 4.3: Prometheus Configuration
+# Prometheus scraping configuration for Mycelial Finance
+
+global:
+  scrape_interval: 15s      # Scrape metrics every 15 seconds
+  evaluation_interval: 15s  # Evaluate rules every 15 seconds
+  external_labels:
+    cluster: 'mycelial-finance'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+
+# Load alerting rules
+rule_files:
+  - 'alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Mycelial Finance application metrics
+  - job_name: 'mycelial-trading-bot'
+    static_configs:
+      - targets: ['trading-bot:9090']
+        labels:
+          service: 'trading-bot'
+          component: 'application'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'
+
+  # Redis exporter (optional - requires redis_exporter container)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          component: 'cache'

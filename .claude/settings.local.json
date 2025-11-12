@@ -45,7 +45,15 @@
       "Bash(exit 0)",
       "Bash(powershell:*)",
       "Bash(python:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(if [ -d \"src/services\" ])",
+      "Bash(then echo \"Directory exists\")",
+      "Bash(else mkdir -p src/services)",
+      "Bash(fi)",
+      "Bash(if [ ! -d \"src/agents/base\" ])",
+      "Bash(then mkdir -p src/agents/base)",
+      "Bash(if [ ! -d \"src/backtesting\" ])",
+      "Bash(then mkdir -p src/backtesting)"
     ],
     "deny": [],
     "ask": []

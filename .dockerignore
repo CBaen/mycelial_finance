@@ -1,0 +1,74 @@
+# .dockerignore - PHASE 4.2: Exclude unnecessary files from Docker context
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Tests
+tests/
+*.test.py
+
+# Logs
+*.log
+logs/
+
+# Database (will be mounted as volume)
+*.db
+*.db-journal
+
+# Environment files (use docker-compose env)
+.env
+.env.*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Backtest results
+backtest_results.json
+*.csv
+
+# Data directories (mounted as volumes)
+data/
