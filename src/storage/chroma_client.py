@@ -54,12 +54,9 @@ class ChromaDBClient:
 
         self.persist_directory = persist_directory
 
-        # Initialize ChromaDB client
+        # Initialize ChromaDB client (new API)
         if client_type == "persistent":
-            self.client = chromadb.Client(Settings(
-                chroma_db_impl="duckdb+parquet",
-                persist_directory=persist_directory
-            ))
+            self.client = chromadb.PersistentClient(path=persist_directory)
             logging.info(f"[CHROMADB] Persistent client initialized at {persist_directory}")
         else:
             self.client = chromadb.Client()
